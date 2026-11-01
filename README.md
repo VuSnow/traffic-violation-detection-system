@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `scene.py`, `red_light.py`, `evidence.py`). Next: **Notebook 06 — License Plate Recognition**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`). Next: **Notebook 06 — License Plate Recognition**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -138,16 +138,35 @@ pytest
 
 The tests decode the committed clips in `data/` and compare every frame-access path against reference frame hashes; they take well under a minute on the GPU server.
 
-### Detecting objects in a video
+### Running a step on a video
+
+Each step is a set of small functions, one per task, with one function at the end that joins them. That last function takes a video and an output folder, and saves `<video name>_output.mp4` there, at the size and frame rate of the input:
 
 ```python
 from traffic_violation_detection.detection import annotate_video
+from traffic_violation_detection.red_light import detect_red_light_video
+from traffic_violation_detection.tracking import track_video
+from traffic_violation_detection.wrong_way import detect_wrong_way_video
 
-output_path = annotate_video("path/to/video.mp4", "path/to/output_folder")
-# -> path/to/output_folder/video_output.mp4
+annotate_video("video.mp4", "outputs/detection")   # boxes and labels
+track_video("video.mp4", "outputs/tracking")       # boxes, ids and recent paths
+
+# Violation steps also need the camera's scene configuration, which cannot be read from the video.
+detect_wrong_way_video("video.mp4", "outputs/wrong_way", "configs/scenes/scene.json")
+detect_red_light_video("video.mp4", "outputs/red_light", "configs/scenes/scene.json")
 ```
 
-The output is a copy of the video with its bounding boxes drawn, at the same size and frame rate. It is for viewing: later steps should read the original video. This needs the `detection` extra (`pip install -e ".[detection]"`) and uses a GPU when one is available. A CPU works but is slow: on the GPU server's CPU, 12 frames took about 9 s, including loading the detector.
+| Function | Module | Also saves |
+| --- | --- | --- |
+| `annotate_video` | `detection.py` | |
+| `track_video` | `tracking.py` | |
+| `detect_wrong_way_video` | `wrong_way.py` | `<video name>_violation_clips/`, `<video name>_events.json` |
+| `detect_red_light_video` | `red_light.py` | `<video name>_violation_clips/`, `<video name>_events.json` |
+
+- **Use one folder per step.** The steps save the same file name, so a shared folder would overwrite the earlier video.
+- **Violation clips are the input to plate reading.** There is one per candidate, with original pixels, and `manifest.json` gives the vehicle's box in each frame. Output videos have drawings on them and are for viewing.
+- **Candidates are never verdicts.** Every event is `pending` until a person reviews it.
+- **Requirements.** These need the `detection` and `tracking` extras, and use a GPU when one is available. A CPU works but is slow: on the GPU server's CPU, 12 frames took about 9 s, including loading the detector.
 
 ### Running on a GPU server
 
@@ -236,7 +255,8 @@ Notebook 05b is complete on the GPU server:
 - [x] Signal reader: no wrong reading in 523 scored readings, though it gives no answer on monochrome footage or for the left signal by day.
 - [x] Logic test on a video with a synthetic signal: all 6 crossings behave as designed.
 - [x] One video clip per candidate, with original pixels, plus a manifest of the vehicle's box in each frame, as input to Notebook 06. In the night clips, fast vehicles are motion-blurred in the source, so their plates may not be readable.
-- [ ] **A new video needs its stop line and signal positions declared by hand first;** there is no single command yet that goes from a video to its clips.
+- [x] `detect_red_light_video` joins every step into one call, and reproduces all 16 candidates and the same scores.
+- [ ] **A new video needs its stop line and signal positions declared by hand first.**
 - [ ] **The labels were made by the AI assistant that wrote the rule, and await a person's review.** The footage was selected for violations (24 of 25 crossings on red, none on green), so these scores do not predict ordinary traffic.
 
 Notebook 05 is complete on the GPU server:
@@ -245,6 +265,7 @@ Notebook 05 is complete on the GPU server:
 - [x] 15 of 15 valid and invalid scenarios behave as required; missing information never produces a violation.
 - [x] Real clip: no candidate events. Near misses were checked by eye, and optical flow agrees, with a positive control.
 - [x] Sensitivity measured by reversing real trajectories: 10 of 15 caught, with no real track flagged. **The rule has not yet been tested on a real wrong-way vehicle.**
+- [x] `detect_wrong_way_video` joins every step into one call. It reproduces the status of all 136 tracks, and finds 11 candidates when the clip is played backward as a control.
 
 Notebook 04 is complete on the GPU server:
 
