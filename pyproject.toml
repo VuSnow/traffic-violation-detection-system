@@ -12,6 +12,8 @@ dependencies = [
     "numpy>=1.26",
     "opencv-python-headless>=4.9",
     "scipy>=1.11",
+    # Provides an ffmpeg binary for writing clips, on machines without a system ffmpeg.
+    "imageio-ffmpeg>=0.5",
 ]
 
 [project.optional-dependencies]
