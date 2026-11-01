@@ -31,6 +31,7 @@ PLATE_SETTINGS = {
     "version": 1,
     "detector_model": "yolo-v9-t-640-license-plate-end2end",
     "ocr_model": "cct-s-v2-global-model",
+    "cpu_threads": 8,
     "frames_per_track": 12,    # The frames where the vehicle looks largest.
     "min_frame_gap": 4,        # Neighbouring frames are nearly the same, so they would not be independent votes.
     "vehicle_margin": 0.15,    # A box can cut off the plate, so the crop extends beyond it.
@@ -52,15 +53,23 @@ STATUS_COLORS_BGR = {READ: (80, 220, 80), UNCERTAIN: (0, 220, 255), UNREADABLE: 
 
 
 def load_plate_models(settings: dict = PLATE_SETTINGS) -> tuple:
-    """The plate detector and the OCR. They use the GPU when ONNX Runtime can."""
+    """The plate detector and the OCR, on the CPU on purpose.
+
+    Running ONNX on the GPU moved PyTorch's later detections by about 0.01 px, enough to change 15 of
+    136 tracks, so results depended on what had run before. On the CPU the detections stay identical,
+    and the plate results were the same on both (Notebook 06).
+    """
     try:
         import onnxruntime as ort
         from fast_plate_ocr import LicensePlateRecognizer
         from open_image_models import create_detector
     except ImportError as error:
         raise RuntimeError('Plate reading needs its models: pip install -e ".[plates]"') from error
-    providers = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in ort.get_available_providers()]
-    return create_detector(settings["detector_model"], providers=providers), LicensePlateRecognizer(settings["ocr_model"], providers=providers)
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = settings["cpu_threads"]
+    options.inter_op_num_threads = 1
+    arguments = {"providers": ["CPUExecutionProvider"], "sess_options": options}
+    return create_detector(settings["detector_model"], **arguments), LicensePlateRecognizer(settings["ocr_model"], **arguments)
 
 
 def select_frames(rows: list, count: int, min_gap: int) -> list:

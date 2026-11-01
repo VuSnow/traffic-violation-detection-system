@@ -381,3 +381,13 @@ def test_no_real_plate_from_the_private_labels_appears_in_committed_tests_or_cod
 
 def test_settings_are_json():
     json.dumps(PLATE_SETTINGS)
+
+
+def test_plate_models_stay_on_the_cpu():
+    # On the GPU they change PyTorch's later detections, and with them the tracks.
+    pytest.importorskip("onnxruntime")
+    pytest.importorskip("fast_plate_ocr")
+    pytest.importorskip("open_image_models")
+    detector, reader = plates.load_plate_models()
+    assert detector.model.get_providers() == ["CPUExecutionProvider"]
+    assert reader.model.get_providers() == ["CPUExecutionProvider"]
