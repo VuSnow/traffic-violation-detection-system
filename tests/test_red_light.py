@@ -27,12 +27,14 @@ from traffic_violation_detection.red_light import (
     read_group_state,
     read_head_state,
     read_lamp_state,
+    score_candidates,
     smooth_states,
 )
 
 W, H, FPS = 1280, 720, 30.0
 LANE_ANGLE = -24.0
 SCENE_PATH = Path(__file__).resolve().parents[1] / "configs" / "scenes" / "rlr_occasions.json"
+LABELS_PATH = Path(__file__).resolve().parents[1] / "data" / "annotations" / "rlr_occasions_labels.json"
 CLIP = {
     "start": 0,
     "end": 400,
@@ -233,6 +235,76 @@ def candidate(frame, x):
 def test_deduplicate_merges_nearby_candidates_only():
     records = [candidate(100, 500), candidate(110, 540), candidate(200, 500), candidate(110, 900)]
     assert [(r["frame"], r["x"]) for r in deduplicate(records, FPS)] == [(100, 500), (110, 900), (200, 500)]
+
+
+def label(kind, frame, x, identifier="L"):
+    return {"id": identifier, "label": kind, "frame": frame, "x": x}
+
+
+def score(candidates, events):
+    return score_candidates(candidates, events, max_frame_difference=30, max_x_difference=200)
+
+
+def test_score_counts_a_matched_violation_as_true_positive():
+    result = score([candidate(100, 500)], [label("violation", 110, 550)])
+    assert len(result["true_positives"]) == 1 and not result["false_positives"] and not result["false_negatives"]
+
+
+def test_score_counts_an_unmatched_candidate_as_false_positive():
+    result = score([candidate(100, 500)], [])
+    assert result["false_positives"] == [(candidate(100, 500), None)]
+
+
+def test_score_counts_a_not_violation_match_as_false_positive():
+    result = score([candidate(100, 500)], [label("not_violation", 100, 500)])
+    assert len(result["false_positives"]) == 1 and not result["true_positives"]
+
+
+def test_score_ignores_a_match_to_an_uncertain_label():
+    result = score([candidate(100, 500)], [label("uncertain", 100, 500)])
+    assert len(result["ignored"]) == 1 and not result["false_positives"] and not result["true_positives"]
+
+
+def test_score_reports_a_missed_violation_only():
+    events = [label("violation", 100, 500, "V"), label("not_violation", 300, 500, "N"), label("uncertain", 500, 500, "U")]
+    assert [e["id"] for e in score([], events)["false_negatives"]] == ["V"]
+
+
+@pytest.mark.parametrize("frame, x", [(131, 500), (69, 500), (100, 701), (100, 299)])
+def test_score_does_not_match_beyond_the_limits(frame, x):
+    result = score([candidate(frame, x)], [label("violation", 100, 500)])
+    assert not result["true_positives"] and len(result["false_positives"]) == 1 and len(result["false_negatives"]) == 1
+
+
+def test_score_second_candidate_for_a_vehicle_is_a_false_positive():
+    result = score([candidate(100, 500), candidate(105, 500)], [label("violation", 100, 500)])
+    assert len(result["true_positives"]) == 1 and len(result["false_positives"]) == 1
+    assert result["true_positives"][0][0]["frame"] == 100
+
+
+def test_score_gives_a_label_to_the_closest_candidate_in_time():
+    result = score([candidate(120, 500), candidate(102, 500)], [label("violation", 100, 500)])
+    assert result["true_positives"][0][0]["frame"] == 102
+
+
+def test_score_keeps_nearby_vehicles_apart():
+    events = [label("violation", 100, 300, "A"), label("violation", 100, 800, "B")]
+    result = score([candidate(100, 310), candidate(100, 790)], events)
+    assert sorted(event["id"] for _, event in result["true_positives"]) == ["A", "B"]
+
+
+def test_committed_labels_cover_all_clips_of_the_scene():
+    labels = json.loads(LABELS_PATH.read_text())
+    scene = json.loads(SCENE_PATH.read_text())
+    assert set(labels["clips"]) == {n for n, c in scene["clips"].items() if c["role"] == "evaluation"}
+    assert set(labels["development_clips"]) == {n for n, c in scene["clips"].items() if c["role"] == "development"}
+    for name, clip in {**labels["clips"], **labels["development_clips"]}.items():
+        start, end = scene["clips"][name]["start"], scene["clips"][name]["end"]
+        for event in clip["events"]:
+            assert event["label"] in ("violation", "not_violation", "uncertain")
+            assert start <= event["frame"] < end, event["id"]
+        for intervals in clip["signal"].values():
+            assert all(start <= a <= b < end and state in ("red", "yellow", "green") for a, b, state in intervals), name
 
 
 def test_event_is_pending_and_its_id_differs_from_the_track_id():

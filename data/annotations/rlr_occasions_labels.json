@@ -132,5 +132,37 @@
         {"id": "R-u1", "label": "uncertain", "frame": 5097, "x": 600, "class": "car", "note": "Blue sedan with its front already across the line when the clip starts; the signal at its entry is not visible. It continues into a collision."}
       ]
     }
+  },
+  "development_clips_note": "Labelled with the same protocol, but NOT blind: the annotator had already seen the rule's output on these clips while shaping it. Their scores are optimistic and are reported separately. Clip H is monochrome, so its signal states come from the position of the lit lamp, which the rule does not use.",
+  "development_clips": {
+    "B": {
+      "signal": {"through": [[378, 898, "red"]], "left": [[378, 898, "red"]]},
+      "events": [
+        {"id": "B1", "label": "violation", "frame": 712, "x": 690, "class": "truck", "note": "Silver pickup stops with its front past the line, then moves on across the junction on red. 'frame' is when its rear crosses, which is when it continues."},
+        {"id": "B-n1", "label": "not_violation", "frame": 600, "x": 905, "class": "car", "note": "Silver hatchback stops on the line and stays until the end of the clip."},
+        {"id": "B-u1", "label": "uncertain", "frame": 401, "x": 1200, "class": "car", "note": "Silver sedan in the right-turn lane, leaves through the right edge."},
+        {"id": "B-u2", "label": "uncertain", "frame": 558, "x": 1199, "class": "car", "note": "Silver SUV in the right-turn lane, leaves through the right edge."},
+        {"id": "B-u3", "label": "uncertain", "frame": 739, "x": 1203, "class": "car", "note": "Silver sedan in the right-turn lane, leaves through the right edge."},
+        {"id": "B-u4", "label": "uncertain", "frame": 905, "x": 630, "class": "car", "note": "Dark minivan reaches the line as the clip ends."}
+      ]
+    },
+    "F": {
+      "signal": {"through": [[1662, 1822, "red"]], "left": [[1662, 1822, "red"]]},
+      "events": [
+        {"id": "F1", "label": "violation", "frame": 1757, "x": 1040, "class": "car", "note": "Dark coupe continues straight across the junction."},
+        {"id": "F-n1", "label": "not_violation", "frame": 1781, "x": 770, "class": "car", "note": "White car stops with its front about at the line."},
+        {"id": "F-u1", "label": "uncertain", "frame": 1810, "x": 1260, "class": "car", "note": "Dark car in the right-turn lane, leaves through the right edge."}
+      ]
+    },
+    "H": {
+      "signal": {"through": [[2336, 2936, "red"], [2956, 2956, "green"]], "left": [[2336, 2956, "red"]]},
+      "events": [
+        {"id": "H1", "label": "violation", "frame": 2565, "x": 1080, "class": "car", "note": "Top lamp lit; the image has no colour."},
+        {"id": "H2", "label": "violation", "frame": 2590, "x": 880, "class": "car", "note": "Top lamp lit. Slows near the line, then continues."},
+        {"id": "H3", "label": "violation", "frame": 2590, "x": 620, "class": "car", "note": "Top lamp lit. Continues across the junction."},
+        {"id": "H4", "label": "violation", "frame": 2762, "x": 810, "class": "car", "note": "Top lamp lit. Continues across the junction."},
+        {"id": "H5", "label": "violation", "frame": 2787, "x": 560, "class": "car", "note": "Top lamp lit. Continues across the junction."}
+      ]
+    }
   }
 }

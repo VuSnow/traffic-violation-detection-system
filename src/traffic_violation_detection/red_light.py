@@ -238,6 +238,37 @@ def deduplicate(records: list[dict], fps: float, rule: dict = RULE) -> list[dict
     return kept
 
 
+def score_candidates(candidates: list[dict], events: list[dict], max_frame_difference: int, max_x_difference: float) -> dict:
+    """Match candidates to labelled events one-to-one, closest in time first, and sort them into outcomes.
+
+    A candidate matched to no label, or to a ``not_violation`` label, is a false positive. One matched
+    to an ``uncertain`` label is ignored. A ``violation`` label with no candidate is a false negative.
+    A second candidate for the same vehicle finds its label taken, so it counts as a false positive.
+    """
+    pairs = sorted(
+        (abs(c["frame"] - e["frame"]), abs(c["x"] - e["x"]), i, j)
+        for i, c in enumerate(candidates)
+        for j, e in enumerate(events)
+        if abs(c["frame"] - e["frame"]) <= max_frame_difference and abs(c["x"] - e["x"]) <= max_x_difference
+    )
+    matched, used = {}, set()
+    for _, _, i, j in pairs:
+        if i not in matched and j not in used:
+            matched[i] = j
+            used.add(j)
+    outcome = {"true_positives": [], "false_positives": [], "ignored": []}
+    for i, candidate in enumerate(candidates):
+        event = events[matched[i]] if i in matched else None
+        if event is not None and event["label"] == "violation":
+            outcome["true_positives"].append((candidate, event))
+        elif event is not None and event["label"] == "uncertain":
+            outcome["ignored"].append((candidate, event))
+        else:
+            outcome["false_positives"].append((candidate, event))
+    outcome["false_negatives"] = [e for j, e in enumerate(events) if e["label"] == "violation" and j not in used]
+    return outcome
+
+
 def build_event(record: dict, clip_name: str, video_id: str, fps: float, clip_start: int, signal_source: str = "camera", rule: dict = RULE) -> dict:
     """A reviewable candidate event. Its status is always pending, and its id never reuses the track id alone."""
     frame = record["frame"]
