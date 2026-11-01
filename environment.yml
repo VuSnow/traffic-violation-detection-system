@@ -3,11 +3,12 @@
 # Create:   conda env create -f environment.yml
 # Activate: conda activate tvd
 # Install project + notebook dependencies (from the repository root):
-#           pip install -e ".[notebooks]"
+#           pip install -e ".[notebooks,dev]"
+# On the GPU server, add the detection extra (PyTorch, Ultralytics):
+#           pip install -e ".[notebooks,dev,detection]"
 #
-# Deep-learning dependencies (PyTorch, detector packages) are intentionally
-# NOT listed yet: they are added in Notebook 02, because the correct PyTorch
-# build depends on the CUDA version of the GPU server.
+# PyTorch comes from PyPI rather than conda: the default PyPI wheel bundles its
+# CUDA runtime (verified: torch 2.15.0+cu132 with NVIDIA driver 580).
 name: tvd
 channels:
   - conda-forge

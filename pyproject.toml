@@ -19,6 +19,15 @@ notebooks = [
     "ipykernel>=6.29",
     "matplotlib>=3.8",
 ]
+# GPU server only. Versions verified in Notebook 02: torch 2.15.0 (CUDA 13.2 build,
+# NVIDIA driver 580), torchvision 0.29.2, ultralytics 8.4.197.
+# Ultralytics is AGPL-3.0 licensed, and it pulls in opencv-python next to
+# opencv-python-headless; both must stay at the same version (they share the cv2 module).
+detection = [
+    "torch>=2.15",
+    "torchvision>=0.29",
+    "ultralytics>=8.4,<8.5",
+]
 dev = [
     "pytest>=8",
 ]
