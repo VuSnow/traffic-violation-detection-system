@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–04 (environment & dataset, video reading, object detection, multi-object tracking, scene configuration) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 05 — Violation Detection**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, violation detection) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `scene.py`). Next: **Notebook 06 — License Plate Recognition**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -50,7 +50,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections | Done (GPU server) |
 | 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories; ByteTrack vs OC-SORT vs BoT-SORT | Done (GPU server) |
 | 04 | `04_traffic_scene_configuration.ipynb` | Camera registration; regions, lines, directions and signal as machine-readable config | Done (GPU server) |
-| 05 | `05_violation_detection.ipynb` | One feasible violation type as an explicit, testable rule | Planned |
+| 05 | `05_violation_detection.ipynb` | Wrong-way driving as an explicit, testable rule; no real violation found in the clip | Done (GPU server) |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR, with explicit unknown/unreadable state | Planned |
 | 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication | Planned |
 | 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Planned |
@@ -162,7 +162,7 @@ Details, observations, and a suitability assessment per violation type are in No
 | Video processing | OpenCV, FFmpeg (when needed) |
 | Object detection | Ultralytics YOLO26m, COCO-pretrained, `imgsz=1280` (baseline chosen in Notebook 02). Ultralytics is **AGPL-3.0** licensed, unlike this MIT repository. |
 | Multi-object tracking | OC-SORT with ByteTrack-style low-score association, via BoxMOT (**AGPL-3.0**); chosen over ByteTrack and BoT-SORT in Notebook 03 |
-| Violation detection | Rule-based logic using tracked trajectories and scene configuration |
+| Violation detection | Rule-based logic using tracked trajectories and scene configuration; wrong-way driving first (Notebook 05) |
 | License plate recognition | Plate detection + OCR (to be evaluated in Notebook 06) |
 | API/backend | FastAPI (planned) |
 | Database | PostgreSQL (planned) |
@@ -194,7 +194,16 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 05: Violation Detection** (next) — inputs: `configs/scenes/video-test.json` and the reference-coordinate trajectories, camera motion and signal states in `outputs/04_traffic_scene_configuration/` (regenerate them by running Notebooks 02–04 on the GPU server). First candidate: wrong-way driving on the two carriageways.
+**Phase 1 / Notebook 06: License Plate Recognition** (next). The most valuable addition to the project is footage with a real violation; see the requirements below.
+
+Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
+
+Notebook 05 is complete on the GPU server:
+
+- [x] Wrong-way driving defined as an explicit rule with five testable conditions; every track gets an explicit status.
+- [x] 15 of 15 valid and invalid scenarios behave as required; missing information never produces a violation.
+- [x] Real clip: no candidate events. Near misses were checked by eye, and optical flow agrees, with a positive control.
+- [x] Sensitivity measured by reversing real trajectories: 10 of 15 caught, with no real track flagged. **The rule has not yet been tested on a real wrong-way vehicle.**
 
 Notebook 04 is complete on the GPU server:
 
