@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00 (environment & dataset) and 01 (video reading) are done locally; next is refactoring the validated video reader into `src/`, then **Notebook 02 — Object Detection** on a GPU server.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00 (environment & dataset) and 01 (video reading) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 02 — Object Detection**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -116,6 +116,15 @@ jupyter notebook notebooks/
 
 Open `notebooks/00_environment_and_dataset.ipynb` and select the **Python (tvd)** kernel.
 
+### Running the tests
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+The tests decode the committed clips in `data/` and compare every frame-access path against reference frame hashes; they take well under a minute on the GPU server.
+
 ### Running on a GPU server
 
 Notebooks 00–01 (video reading) run on CPU. Object detection (Notebook 02 onward) is intended to run on a rented GPU server:
@@ -183,7 +192,7 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 Before starting:
 
-- [ ] Move the validated video-reading functions from Notebook 01 into `src/traffic_violation_detection/` with `pytest` tests.
+- [x] Move the validated video-reading functions from Notebook 01 into `src/traffic_violation_detection/video.py`, with 43 `pytest` tests in `tests/test_video.py`.
 - [x] Set up the conda environment on the GPU server (RTX 4090) and re-run Notebooks 00–01 there — all checks pass.
 
 Notebook 01 is complete on the development machine:
