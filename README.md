@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `scene.py`, `red_light.py`, `evidence.py`). Next: **Notebook 06 — License Plate Recognition**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `scene.py`, `red_light.py`, `evidence.py`). Next: **Notebook 06 — License Plate Recognition**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -47,7 +47,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | --- | --- | --- | --- |
 | 00 | `00_environment_and_dataset.ipynb` | Reproducible environment; inspect the sample videos | Done (verified locally and on the GPU server) |
 | 01 | `01_video_reading.ipynb` | Video representation, metadata, frame access with OpenCV | Done (verified locally and on the GPU server) |
-| 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections | Done (GPU server) |
+| 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections, and a video with its boxes drawn | Done (GPU server) |
 | 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories; ByteTrack vs OC-SORT vs BoT-SORT | Done (GPU server) |
 | 04 | `04_traffic_scene_configuration.ipynb` | Camera registration; regions, lines, directions and signal as machine-readable config | Done (GPU server) |
 | 05 | `05_violation_detection.ipynb` | Wrong-way driving as an explicit, testable rule; no real violation found in the clip | Done (GPU server) |
@@ -137,6 +137,17 @@ pytest
 ```
 
 The tests decode the committed clips in `data/` and compare every frame-access path against reference frame hashes; they take well under a minute on the GPU server.
+
+### Detecting objects in a video
+
+```python
+from traffic_violation_detection.detection import annotate_video
+
+output_path = annotate_video("path/to/video.mp4", "path/to/output_folder")
+# -> path/to/output_folder/video_output.mp4
+```
+
+The output is a copy of the video with its bounding boxes drawn, at the same size and frame rate. It is for viewing: later steps should read the original video. This needs the `detection` extra (`pip install -e ".[detection]"`) and uses a GPU when one is available. A CPU works but is slow: on the GPU server's CPU, 12 frames took about 9 s, including loading the detector.
 
 ### Running on a GPU server
 
