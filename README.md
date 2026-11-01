@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–02 (environment & dataset, video reading, object detection) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 03 — Multi-Object Tracking**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–03 (environment & dataset, video reading, object detection, multi-object tracking) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 04 — Traffic Scene Configuration**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -48,7 +48,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 00 | `00_environment_and_dataset.ipynb` | Reproducible environment; inspect the sample videos | Done (verified locally and on the GPU server) |
 | 01 | `01_video_reading.ipynb` | Video representation, metadata, frame access with OpenCV | Done (verified locally and on the GPU server) |
 | 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections | Done (GPU server) |
-| 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories (e.g. ByteTrack) | Planned |
+| 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories; ByteTrack vs OC-SORT vs BoT-SORT | Done (GPU server) |
 | 04 | `04_traffic_scene_configuration.ipynb` | ROI, lanes, stop lines, directions as machine-readable config | Planned |
 | 05 | `05_violation_detection.ipynb` | One feasible violation type as an explicit, testable rule | Planned |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR, with explicit unknown/unreadable state | Planned |
@@ -132,6 +132,12 @@ Notebooks 00–01 (video reading) run on CPU. Object detection (Notebook 02 onwa
 1. Copy the repository to the server, e.g. `rsync -az --chown=root:root --exclude outputs/ ./ <server>:/workspace/traffic-violation-detection-system/` (or `git clone`). The committed test clips in `data/` come with it.
 2. Create the same conda environment with the commands above. If `conda` is not on `PATH` (e.g. vast.ai images), run `source /opt/miniforge3/etc/profile.d/conda.sh` first.
 3. Install the detection extra: `pip install -e ".[notebooks,dev,detection]"`. This adds PyTorch, torchvision and Ultralytics. The default PyPI PyTorch wheel bundles its CUDA runtime; it was verified as `torch 2.15.0+cu132` with NVIDIA driver 580 (check yours with `nvidia-smi`). Model weights are downloaded to `weights/` (git-ignored) on first use.
+4. For tracking (Notebook 03), add the tracking extra, then BoxMOT **without its dependencies**. BoxMOT 26.0.0 pins `opencv-python==4.11.0.86`, which would otherwise downgrade the shared `cv2` module:
+
+   ```bash
+   pip install -e ".[tracking]"
+   pip install --no-deps boxmot==26.0.0
+   ```
 
 Rented instances are often not persistent: copy notebooks and results back (e.g. with `rsync`) before stopping or destroying the instance.
 
@@ -155,7 +161,7 @@ Details, observations, and a suitability assessment per violation type are in No
 | Environment | Conda + pip (`pyproject.toml`) |
 | Video processing | OpenCV, FFmpeg (when needed) |
 | Object detection | Ultralytics YOLO26m, COCO-pretrained, `imgsz=1280` (baseline chosen in Notebook 02). Ultralytics is **AGPL-3.0** licensed, unlike this MIT repository. |
-| Multi-object tracking | ByteTrack or BoT-SORT (to be evaluated in Notebook 03) |
+| Multi-object tracking | OC-SORT with ByteTrack-style low-score association, via BoxMOT (**AGPL-3.0**); chosen over ByteTrack and BoT-SORT in Notebook 03 |
 | Violation detection | Rule-based logic using tracked trajectories and scene configuration |
 | License plate recognition | Plate detection + OCR (to be evaluated in Notebook 06) |
 | API/backend | FastAPI (planned) |
@@ -188,7 +194,13 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 03: Multi-Object Tracking** (next) — input: `outputs/02_object_detection/detections/video-test.jsonl` (regenerate it by running Notebook 02 on the GPU server).
+**Phase 1 / Notebook 04: Traffic Scene Configuration** (next) — inputs: the baseline tracks and trajectories in `outputs/03_multi_object_tracking/tracks/` (regenerate them by running Notebooks 02–03 on the GPU server). The camera drift found in Notebook 00 (≈110 px) must be handled before drawing stop lines or lanes.
+
+Notebook 03 is complete on the GPU server:
+
+- [x] Tracking Data contract defined (per-frame JSON Lines, ids scoped by `tracking_session`) and per-vehicle trajectories built (bottom-center points).
+- [x] ByteTrack mechanism demonstrated: IoU + Hungarian association, a constant-velocity Kalman filter through a hidden gap, and the value of low-confidence ("byte") association.
+- [x] ByteTrack, OC-SORT and BoT-SORT (with/without camera-motion compensation and ReID) compared on the same detections with proxy metrics; baseline **OC-SORT + byte** chosen by a pre-declared rule.
 
 Notebook 02 is complete on the GPU server:
 
