@@ -375,8 +375,14 @@ def test_no_real_plate_from_the_private_labels_appears_in_committed_tests_or_cod
         pytest.skip("Private labels are only on machines that have them.")
     videos = json.loads(labels_path.read_text())["videos"].values()
     real = {t["text"] for video in videos for t in video["tracks"].values() if "text" in t}
-    committed = [Path(__file__), root / "src" / "traffic_violation_detection" / "plates.py", root / "README.md"]
-    assert real and not [text for text in real for path in committed if text in path.read_text()]
+    committed = [Path(__file__).read_text(), (root / "src" / "traffic_violation_detection" / "plates.py").read_text(), (root / "README.md").read_text()]
+    notebook_path = root / "notebooks" / "06_license_plate_recognition.ipynb"
+    if notebook_path.exists():
+        # Only text is checked. Image outputs are stripped on commit, and their encoded bytes could match by chance.
+        for cell in json.loads(notebook_path.read_text())["cells"]:
+            committed.append("".join(cell["source"]))
+            committed += ["".join(output.get("text", "")) for output in cell.get("outputs", [])]
+    assert real and not [text for text in real for content in committed if text in content]
 
 
 def test_settings_are_json():
