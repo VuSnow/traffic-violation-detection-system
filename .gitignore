@@ -219,3 +219,16 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 .DS_Store
+
+# --- Project-specific (see docs/project_specification.md §5) ---
+# Generated experiment outputs (frames, annotated videos, evidence, events, evaluations)
+outputs/
+# Model weights / exported models
+weights/
+*.pt
+*.pth
+*.onnx
+*.engine
+# Raw footage stays local by default. The small test clips already committed
+# directly under data/ remain tracked.
+data/raw/

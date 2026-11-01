@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "traffic-violation-detection"
+version = "0.1.0"
+description = "AI-assisted traffic violation detection with human review (academic project)."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "opencv-python-headless>=4.9",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "notebook>=7",
+    "ipykernel>=6.29",
+    "matplotlib>=3.8",
+]
+dev = [
+    "pytest>=8",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

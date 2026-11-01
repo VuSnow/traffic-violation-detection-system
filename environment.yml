@@ -1,0 +1,16 @@
+# Conda environment for the Traffic Violation Detection System.
+#
+# Create:   conda env create -f environment.yml
+# Activate: conda activate tvd
+# Install project + notebook dependencies (from the repository root):
+#           pip install -e ".[notebooks]"
+#
+# Deep-learning dependencies (PyTorch, detector packages) are intentionally
+# NOT listed yet: they are added in Notebook 02, because the correct PyTorch
+# build depends on the CUDA version of the GPU server.
+name: tvd
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
