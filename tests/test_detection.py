@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from traffic_violation_detection import detection
-from traffic_violation_detection.detection import CLASS_COLORS_BGR, DETECTOR_CONFIG, annotate_video, detect, draw_detections
+from traffic_violation_detection.detection import DETECTOR_CONFIG, annotate_video, detect, draw_detections
 
 VIDEO = Path(__file__).resolve().parents[1] / "data" / "traffic_sample.mp4"  # 640x360, 24 FPS, 240 frames
 SHORT_VIDEO_FRAMES = 240
@@ -87,11 +87,11 @@ def test_output_keeps_every_frame_the_size_and_the_frame_rate(tmp_path):
 
 def test_only_boxes_above_the_display_threshold_are_drawn(tmp_path):
     frames, _ = frames_of(annotate_video(VIDEO, tmp_path, model=FakeDetector([BOX_ABOVE, BOX_BELOW])))
-    color = np.array(CLASS_COLORS_BGR["car"], dtype=np.float64)
-    distance = lambda pixels: np.abs(pixels.astype(np.float64) - color).mean()
-    # The bottom edge of each box, away from the label.
-    assert distance(frames[0][250, 150:250]) < 40
-    assert distance(frames[0][250, 450:550]) > 40
+    source = frames_of(VIDEO)[0][0]
+    # The bottom edge of each box, away from the label, compared with the source: a drawn line changes it.
+    changed = lambda columns: np.abs(frames[0][250, columns].astype(np.float64) - source[250, columns].astype(np.float64)).mean()
+    assert changed(slice(150, 250)) > 20
+    assert changed(slice(450, 550)) < 5
 
 
 def test_detector_sees_clean_frames_with_the_chosen_settings(tmp_path):

@@ -11,6 +11,9 @@ A crossing is a candidate only if all of these hold:
 - its box does not touch the image border, and the crossing is in the evaluable part of the line.
 
 When information is missing, the crossing is reported as not evaluable, never as a violation.
+
+Small functions come first. ``detect_red_light_video`` at the end joins them into one call that goes
+from a video to a copy showing the result, one clip per candidate, and a file of events.
 """
 
 from __future__ import annotations
@@ -21,6 +24,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 from scipy.ndimage import median_filter
+
+from traffic_violation_detection.detection import OUTPUT_CRF, load_detector
+from traffic_violation_detection.evidence import write_event_clips
+from traffic_violation_detection.tracking import TRACKING_SESSION, add_to_tracks, majority_class, track_frames
+from traffic_violation_detection.video import iter_frames, output_video_path, read_video_metadata, video_writer
 
 RULE = {
     "name": "red_light",
@@ -37,6 +45,8 @@ RULE = {
     "duplicate_seconds": 1.0,
     "duplicate_px": 120,
 }
+
+SIGNAL_GROUPS = ("through", "left")
 
 CANDIDATE = "candidate"
 COMPLIANT = "signal_not_red"
@@ -290,3 +300,130 @@ def build_event(record: dict, clip_name: str, video_id: str, fps: float, clip_st
         "license_plate": None,
         "review_status": "pending",
     }
+
+
+def read_frame_signals(image: np.ndarray, clip: dict) -> dict[str, str]:
+    """The state of each signal group in one frame."""
+    signals = clip["signals"]
+    return {group: read_group_state(image, signals["method"], signals[group]) if signals[group] else "unknown" for group in SIGNAL_GROUPS}
+
+
+def track_and_read_clip(video_path: str | Path, clip: dict, detector) -> tuple[dict[str, list], dict[str, dict[int, str]]]:
+    """One pass over a clip, with a new tracker. Returns its tracks, and each signal group's smoothed state per frame."""
+    tracks: dict[str, list] = {}
+    raw: dict[str, list[str]] = {group: [] for group in SIGNAL_GROUPS}
+    for record, _, tracked in track_frames(video_path, detector, clip["start"], clip["end"]):
+        add_to_tracks(tracks, record["frame_index"], tracked)
+        for group, state in read_frame_signals(record["image"], clip).items():
+            raw[group].append(state)
+    states = {group: {clip["start"] + i: s for i, s in enumerate(smooth_states(values))} for group, values in raw.items()}
+    return tracks, states
+
+
+def as_track(track_id: str, rows: list) -> dict:
+    """The input of ``evaluate_track`` from a track's rows."""
+    return {"track_id": track_id, "class_name": majority_class(rows), "frames": [r[0] for r in rows], "boxes": [r[1:5] for r in rows]}
+
+
+def evaluate_clip(tracks: dict[str, list], clip: dict, states: dict, lane_direction_deg: float, width: int, height: int, fps: float, rule: dict = RULE) -> list[dict]:
+    """The crossing records of a clip's tracks, with duplicate candidates merged."""
+    records = [evaluate_track(as_track(t, rows), clip, states, lane_direction_deg, width, height, rule) for t, rows in tracks.items()]
+    return deduplicate([r for r in records if r], fps, rule)
+
+
+def verdict_color(verdict: str) -> tuple[int, int, int]:
+    if verdict == CANDIDATE:
+        return (40, 40, 230)
+    return (170, 170, 170) if verdict.startswith("not_evaluable") else (80, 200, 80)
+
+
+def draw_clip_frame(image: np.ndarray, clip: dict, present: list[tuple[str, list]], records_by_track: dict[str, dict], frame_index: int) -> None:
+    """Draw the stop line, and each vehicle: neutral until it enters, then colored by the rule's verdict."""
+    thickness = max(1, round(image.shape[0] / 540))
+    cv2.polylines(image, [np.array(clip["stop_line"], np.int32)], False, (0, 255, 0), thickness, cv2.LINE_AA)
+    for track_id, row in present:
+        record = records_by_track.get(track_id)
+        entered = record is not None and frame_index >= record["frame"]
+        color = verdict_color(record["verdict"]) if entered else (235, 235, 235)
+        flagged = entered and record["verdict"] == CANDIDATE
+        x1, y1, x2, y2 = (int(round(v)) for v in row[1:5])
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness * 2 if flagged else thickness)
+        label = f"{track_id} RED LIGHT?" if flagged else track_id
+        cv2.putText(image, label, (x1 + 2, max(14, y1 - 4)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, max(1, thickness), cv2.LINE_AA)
+
+
+def draw_banner(image: np.ndarray, text: str) -> None:
+    """A line of text in a dark band at the top of the frame."""
+    scale = max(0.5, 0.8 * image.shape[0] / 1080)
+    font_thickness = max(1, round(scale * 2.5))
+    (width, height), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, font_thickness)
+    cv2.rectangle(image, (0, 0), (width + 16, height + 16), (0, 0, 0), -1)
+    cv2.putText(image, text, (8, height + 8), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
+
+
+def write_result_video(video_path: Path, output_path: Path, fps: float, clips: dict, tracks: dict, states: dict, records: dict) -> None:
+    """Write the frames of each clip with the stop line, the signal state, each vehicle's verdict, and the candidates so far."""
+    flagged = 0
+    with video_writer(output_path, fps, OUTPUT_CRF) as write_frame:
+        for name, clip in clips.items():
+            by_track = {r["track_id"]: r for r in records[name]}
+            present: dict[int, list] = {}
+            for track_id, rows in tracks[name].items():
+                for row in rows:
+                    present.setdefault(int(row[0]), []).append((track_id, row))
+            entries = sorted(r["frame"] for r in records[name] if r["verdict"] == CANDIDATE)
+            for record in iter_frames(video_path, clip["start"], clip["end"]):
+                image, k = record["image"], record["frame_index"]
+                draw_clip_frame(image, clip, present.get(k, []), by_track, k)
+                so_far = flagged + sum(entry <= k for entry in entries)
+                draw_banner(image, f"through: {states[name]['through'].get(k, '?')}  left: {states[name]['left'].get(k, '?')}  candidates: {so_far} (pending review)")
+                write_frame(image)
+            flagged += len(entries)
+
+
+def detect_red_light_video(video_path: str | Path, output_folder_path: str | Path, scene_path: str | Path, model=None) -> dict:
+    """Find red-light candidates in a video, from start to finish.
+
+    ``scene_path`` is the scene configuration of this camera: its stop line and signal positions
+    cannot be read from the video. Only the frame ranges of its clips are analysed and saved. In
+    ``output_folder_path`` this saves:
+
+    - ``<video name>_output.mp4``: those frames, showing the stop line, the signal state and each verdict;
+    - ``<video name>_violation_clips/``: one clip per candidate with original pixels, and ``manifest.json``;
+    - ``<video name>_events.json``: the candidates, all ``pending``, and every crossing record.
+
+    Returns these paths with the events and records. Earlier files of these names are replaced.
+    """
+    video_path, folder = Path(video_path), Path(output_folder_path)
+    meta = read_video_metadata(video_path)
+    fps, width, height = meta["fps"], meta["width"], meta["height"]
+    scene = load_red_light_scene(scene_path, width, height)
+    detector = model if model is not None else load_detector()
+    clips = scene["clips"]
+    video_id = video_path.stem
+
+    tracks, states, records, events = {}, {}, {}, []
+    for name, clip in clips.items():
+        tracks[name], states[name] = track_and_read_clip(video_path, clip, detector)
+        records[name] = evaluate_clip(tracks[name], clip, states[name], scene["lane_direction_deg"], width, height, fps)
+        events += [build_event(r, name, video_id, fps, clip["start"]) for r in records[name] if r["verdict"] == CANDIDATE]
+
+    output_video = output_video_path(video_path, folder)
+    write_result_video(video_path, output_video, fps, clips, tracks, states, records)
+    manifest = write_event_clips(
+        video_path, events,
+        lambda e: tracks[e["clip"]][e["track_id"]],
+        lambda e: (clips[e["clip"]]["start"], clips[e["clip"]]["end"]),
+        folder / f"{video_id}_violation_clips",
+    )
+    events_path = folder / f"{video_id}_events.json"
+    events_path.write_text(json.dumps({
+        "video_id": video_id,
+        "scene_id": scene["scene_id"],
+        "rule": RULE,
+        "tracking_session": f"{video_id}/{TRACKING_SESSION}",
+        "signal_source": "camera",
+        "events": events,
+        "crossings": records,
+    }, indent=1))
+    return {"output_video": output_video, "clips_manifest": manifest, "events_file": events_path, "events": events, "crossings": records}

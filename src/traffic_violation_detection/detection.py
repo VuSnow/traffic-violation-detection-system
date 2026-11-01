@@ -1,8 +1,9 @@
-"""Object detection on a whole video: a copy of the video with its bounding boxes drawn.
+"""Object detection on a whole video, with the detector settings and drawing style chosen in Notebook 02.
 
-The detector settings, classes and drawing style come from Notebook 02, which chose them.
-The output is for viewing. Later steps should read the original video, because drawn boxes
-would cover what they need to see, such as a license plate.
+Small functions come first, one for each step. ``annotate_video`` at the end joins them into one
+call that goes from a video to a copy with its bounding boxes drawn. That copy is for viewing: later
+steps should read the original video, because drawn boxes would cover what they need to see, such
+as a license plate.
 """
 
 from __future__ import annotations
@@ -12,8 +13,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from traffic_violation_detection.evidence import write_clip
-from traffic_violation_detection.video import read_video_metadata
+from traffic_violation_detection.video import iter_frames, output_video_path, read_video_metadata, video_writer
 
 WEIGHTS_DIR = Path(__file__).resolve().parents[2] / "weights"
 
@@ -80,18 +80,17 @@ def annotate_video(video_path: str | Path, output_folder_path: str | Path, model
     """Detect objects in every frame of a video, and save a copy with the bounding boxes drawn.
 
     The output is ``<output_folder_path>/<video name>_output.mp4``, with the size and frame rate
-    of the input, and replaces an earlier output of the same name. The folder is created if
-    needed. Returns the path of the output video.
+    of the input. It replaces an earlier file of that name, so use one folder per step. The folder
+    is created if needed. Returns the path of the output video.
 
     ``model`` is an already loaded detector, to avoid loading it again for each video.
     """
     video_path = Path(video_path)
-    read_video_metadata(video_path)  # Fails on a bad path before the slow step of loading the detector.
+    fps = read_video_metadata(video_path)["fps"]  # Fails on a bad path before the slow step of loading the detector.
     detector = model if model is not None else load_detector()
-
-    def draw(image: np.ndarray, _frame_index: int) -> None:
-        draw_detections(image, detect(detector, image))
-
-    output_path = Path(output_folder_path) / f"{video_path.stem}_output.mp4"
-    write_clip(video_path, 0, None, output_path, crf=OUTPUT_CRF, draw=draw)
+    output_path = output_video_path(video_path, output_folder_path)
+    with video_writer(output_path, fps, OUTPUT_CRF) as write_frame:
+        for record in iter_frames(video_path):
+            draw_detections(record["image"], detect(detector, record["image"]))
+            write_frame(record["image"])
     return output_path

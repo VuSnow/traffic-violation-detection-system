@@ -7,14 +7,15 @@ Each manifest entry says where the vehicle is in every frame of its clip.
 
 from __future__ import annotations
 
-import shutil
-import subprocess
+import json
 from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 
-from traffic_violation_detection.video import iter_frames, read_video_metadata
+from traffic_violation_detection.video import find_ffmpeg, iter_frames, read_video_metadata, video_writer
+
+__all__ = ["CLIP_SETTINGS", "clip_frame_range", "cut_event_clip", "find_ffmpeg", "write_clip", "write_event_clips"]
 
 CLIP_SETTINGS = {
     "pre_seconds": 3.0,       # at least this long before the trigger
@@ -22,18 +23,6 @@ CLIP_SETTINGS = {
     "post_seconds": 2.0,
     "crf": 14,                # H.264 quality: lower is better, and 14 is close to lossless
 }
-
-
-def find_ffmpeg() -> str:
-    """Path of an ffmpeg binary: the system's, or the one from the imageio-ffmpeg package."""
-    found = shutil.which("ffmpeg")
-    if found:
-        return found
-    try:
-        import imageio_ffmpeg
-    except ImportError as error:
-        raise RuntimeError("Writing clips needs ffmpeg: install it, or the imageio-ffmpeg package.") from error
-    return imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def clip_frame_range(trigger_frame: int, track_start: int, fps: float, limit_start: int, limit_end: int, settings: dict = CLIP_SETTINGS) -> tuple[int, int]:
@@ -52,16 +41,6 @@ def clip_frame_range(trigger_frame: int, track_start: int, fps: float, limit_sta
     return start, end
 
 
-def _encoder_command(width: int, height: int, fps: float, crf: int, out_path: Path) -> list[str]:
-    # H.264 in yuv420p needs even sizes, so an odd side gets one black row or column.
-    return [
-        find_ffmpeg(), "-y", "-loglevel", "error",
-        "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
-        "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-preset", "medium", "-crf", str(crf),
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out_path),
-    ]
-
-
 def write_clip(
     video_path: str | Path,
     start: int,
@@ -73,43 +52,20 @@ def write_clip(
     """Write frames ``[start, end)`` of a video as an H.264 file and return how many were written.
 
     With ``end=None`` it runs to the end of the video. ``draw(image, frame_index)``, if given, may
-    draw on each frame before it is encoded. The file appears only when complete, so a failure
-    leaves no partial clip behind.
+    draw on each frame before it is encoded. A failure leaves no partial clip behind.
     """
     if end is not None and end <= start:
         raise ValueError(f"Empty clip: start={start}, end={end}")
     fps = read_video_metadata(video_path)["fps"]
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    partial = out_path.with_name(out_path.stem + ".partial.mp4")
     written = 0
-    process = None
-    try:
+    with video_writer(out_path, fps, crf) as write_frame:
         for record in iter_frames(video_path, start, end):
-            image = record["image"]
             if draw is not None:
-                draw(image, record["frame_index"])
-            if process is None:
-                # The size comes from a decoded frame, which is what the encoder really receives.
-                height, width = image.shape[:2]
-                process = subprocess.Popen(_encoder_command(width, height, fps, crf, partial), stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-            process.stdin.write(image.tobytes())
+                draw(record["image"], record["frame_index"])
+            write_frame(record["image"])
             written += 1
-    except BrokenPipeError:
-        pass  # ffmpeg stopped early; its message is reported below.
-    except BaseException:
-        if process is not None:
-            process.kill()
-            process.communicate()
-        partial.unlink(missing_ok=True)
-        raise
-    errors = process.communicate()[1] if process is not None else b""
-    complete = process is not None and process.returncode == 0 and (end is None or written == end - start)
-    if not complete:
-        partial.unlink(missing_ok=True)
-        wanted = "" if end is None else f" of {end - start}"
-        raise RuntimeError(f"Clip {out_path.name}: wrote {written}{wanted} frames. {errors.decode(errors='replace').strip()}")
-    partial.replace(out_path)
+        if end is not None and written != end - start:
+            raise RuntimeError(f"Clip {Path(out_path).name}: wrote {written} of {end - start} frames.")
     return written
 
 
@@ -140,7 +96,30 @@ def cut_event_clip(video_path: str | Path, event: dict, track_rows: list, limit_
             for row in track_rows
             if start <= row[0] < end
         ],
-        "signal_source": event["signal_source"],
+        "signal_source": event.get("signal_source"),
         "license_plate": None,
         "review_status": event["review_status"],
     }
+
+
+def write_event_clips(
+    video_path: str | Path,
+    events: list[dict],
+    track_rows_of: Callable[[dict], list],
+    limits_of: Callable[[dict], tuple[int, int]],
+    out_dir: str | Path,
+    settings: dict = CLIP_SETTINGS,
+) -> Path:
+    """Cut one clip per event, write ``manifest.json`` beside them, and return its path. No events gives an empty manifest."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    entries = [cut_event_clip(video_path, event, track_rows_of(event), *limits_of(event), out_dir, settings) for event in events]
+    manifest = out_dir / "manifest.json"
+    manifest.write_text(json.dumps({
+        "schema_version": 1,
+        "video_id": Path(video_path).stem,
+        "source_video": str(video_path),
+        "settings": settings,
+        "clips": entries,
+    }, indent=1))
+    return manifest

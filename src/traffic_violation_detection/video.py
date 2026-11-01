@@ -1,4 +1,4 @@
-"""Video reading utilities, validated in notebooks/01_video_reading.ipynb.
+"""Video reading and writing utilities. Reading was validated in notebooks/01_video_reading.ipynb.
 
 Conventions (verified in Notebook 01):
 
@@ -15,8 +15,10 @@ Conventions (verified in Notebook 01):
 from __future__ import annotations
 
 import math
+import shutil
+import subprocess
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager
 from pathlib import Path
 from typing import TypedDict
@@ -149,3 +151,75 @@ def frame_index_at_time(t_seconds: float, fps: float) -> int:
 def read_frame_at_time(path: str | Path, t_seconds: float) -> FrameRecord:
     fps = read_video_metadata(path)["fps"]
     return read_frame_at(path, frame_index_at_time(t_seconds, fps))
+
+
+def find_ffmpeg() -> str:
+    """Path of an ffmpeg binary: the system's, or the one from the imageio-ffmpeg package."""
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg
+    except ImportError as error:
+        raise RuntimeError("Writing video needs ffmpeg: install it, or the imageio-ffmpeg package.") from error
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _encoder_command(width: int, height: int, fps: float, crf: int, out_path: Path) -> list[str]:
+    # H.264 in yuv420p needs even sizes, so an odd side gets one black row or column.
+    return [
+        find_ffmpeg(), "-y", "-loglevel", "error",
+        "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
+        # Without accurate_rnd, the conversion from BGR shifts every pixel by a few levels and tints gray.
+        "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-sws_flags", "accurate_rnd", "-c:v", "libx264", "-preset", "medium", "-crf", str(crf),
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out_path),
+    ]
+
+
+@contextmanager
+def video_writer(out_path: str | Path, fps: float, crf: int) -> Iterator[Callable[[np.ndarray], None]]:
+    """Write BGR frames to an H.264 file: ``with video_writer(path, fps, crf) as write_frame: write_frame(image)``.
+
+    The size comes from the first frame. The file appears only when the block ends normally, so a
+    failure leaves no partial video behind. Lower ``crf`` means better quality and a larger file.
+    """
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = out_path.with_name(out_path.stem + ".partial.mp4")
+    process = None
+    first_shape = None
+
+    def write_frame(image: np.ndarray) -> None:
+        nonlocal process, first_shape
+        if process is None:
+            first_shape = image.shape
+            height, width = image.shape[:2]
+            process = subprocess.Popen(_encoder_command(width, height, fps, crf, partial), stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        elif image.shape != first_shape:
+            # The encoder reads raw bytes, so a different size would garble the video without any error.
+            raise ValueError(f"Frame of shape {image.shape} in a video of shape {first_shape}")
+        try:
+            process.stdin.write(image.tobytes())
+        except BrokenPipeError as error:
+            message = process.stderr.read().decode(errors="replace").strip()
+            raise RuntimeError(f"ffmpeg stopped while writing {out_path.name}: {message}") from error
+
+    try:
+        yield write_frame
+        if process is None:
+            raise RuntimeError(f"No frames to write to {out_path.name}")
+        _, errors = process.communicate()
+        if process.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed on {out_path.name}: {errors.decode(errors='replace').strip()}")
+    except BaseException:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
+        partial.unlink(missing_ok=True)
+        raise
+    partial.replace(out_path)
+
+
+def output_video_path(video_path: str | Path, output_folder_path: str | Path) -> Path:
+    """Where a step saves its video: ``<output folder>/<video name>_output.mp4``."""
+    return Path(output_folder_path) / f"{Path(video_path).stem}_output.mp4"
