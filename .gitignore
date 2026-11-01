@@ -229,6 +229,7 @@ weights/
 *.pth
 *.onnx
 *.engine
-# Raw footage stays local by default. The small test clips already committed
-# directly under data/ remain tracked.
-data/raw/
+# Video data stays local by default; the small test clips already committed under
+# data/ remain tracked. Hand-made annotations are versioned.
+data/*
+!data/annotations/

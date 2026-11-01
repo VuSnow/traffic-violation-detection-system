@@ -1,0 +1,1249 @@
+{
+  "schema_version": 1,
+  "scene_id": "rlr_occasions",
+  "video": {
+    "file": "data/raw/rlr_occasions.mp4",
+    "width": 1280,
+    "height": 720,
+    "fps": 30.0
+  },
+  "source": "Screen recording of a public YouTube red-light-running compilation; not committed to git. Browser and end-card segments are excluded from the clips.",
+  "lane_direction_deg": -24.0,
+  "assumptions": [
+    "Coordinates are pixels of each clip; the camera is stable within a clip but its framing differs between clips.",
+    "Mast heads 2 and 3 govern the through lanes; head 1 governs the left-turn lane, left of the first lane divider. Supported by clip M, where they differ, but not confirmed for every clip.",
+    "The lane right of the last divider is a right-turn lane. Right turns on red may be legal in this jurisdiction, so they are not flagged.",
+    "A vehicle's front wheels are estimated at 30% of the box height above the box bottom, since vehicles are seen from behind.",
+    "Clips use the role 'development' if they were used to shape the rule, and 'evaluation' if they were kept out of that work."
+  ],
+  "clips": {
+    "A": {
+      "start": 79,
+      "end": 358,
+      "lighting": "day",
+      "stop_line": [
+        [
+          100,
+          400
+        ],
+        [
+          308,
+          408
+        ],
+        [
+          568,
+          422
+        ],
+        [
+          832,
+          439
+        ],
+        [
+          1068,
+          459
+        ],
+        [
+          1280,
+          480
+        ]
+      ],
+      "lane_dividers": [
+        308,
+        568,
+        832,
+        1068
+      ],
+      "signals": {
+        "method": "lamps",
+        "left": [
+          {
+            "red": [
+              568,
+              8
+            ],
+            "yellow": [
+              568,
+              22
+            ],
+            "green": [
+              568,
+              37
+            ]
+          }
+        ],
+        "through": [
+          {
+            "red": [
+              758,
+              34
+            ],
+            "yellow": [
+              758,
+              48
+            ],
+            "green": [
+              758,
+              63
+            ]
+          },
+          {
+            "red": [
+              906,
+              57
+            ],
+            "yellow": [
+              906,
+              71
+            ],
+            "green": [
+              906,
+              86
+            ]
+          }
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "B": {
+      "start": 358,
+      "end": 914,
+      "lighting": "day",
+      "role": "development",
+      "stop_line": [
+        [
+          200,
+          401
+        ],
+        [
+          304,
+          405
+        ],
+        [
+          567,
+          420
+        ],
+        [
+          822,
+          436
+        ],
+        [
+          1063,
+          457
+        ],
+        [
+          1278,
+          479
+        ]
+      ],
+      "lane_dividers": [
+        304,
+        567,
+        822,
+        1063
+      ],
+      "signals": {
+        "method": "lamps",
+        "left": [
+          {
+            "red": [
+              569,
+              6
+            ],
+            "yellow": [
+              569,
+              20
+            ],
+            "green": [
+              569,
+              34
+            ]
+          }
+        ],
+        "through": [
+          {
+            "red": [
+              756,
+              31
+            ],
+            "yellow": [
+              756,
+              47
+            ],
+            "green": [
+              756,
+              62
+            ]
+          },
+          {
+            "red": [
+              906,
+              54
+            ],
+            "yellow": [
+              906,
+              70
+            ],
+            "green": [
+              906,
+              85
+            ]
+          }
+        ]
+      },
+      "evaluable_x_max": 1280
+    },
+    "C": {
+      "start": 914,
+      "end": 1122,
+      "lighting": "night",
+      "stop_line": [
+        [
+          190,
+          490
+        ],
+        [
+          420,
+          492
+        ],
+        [
+          664,
+          500
+        ],
+        [
+          936,
+          508
+        ],
+        [
+          1180,
+          522
+        ],
+        [
+          1280,
+          532
+        ]
+      ],
+      "lane_dividers": [
+        420,
+        664,
+        936,
+        1180
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            650,
+            62,
+            685,
+            128
+          ]
+        ],
+        "through": [
+          [
+            835,
+            80,
+            878,
+            150
+          ],
+          [
+            985,
+            100,
+            1026,
+            170
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "D": {
+      "start": 1122,
+      "end": 1391,
+      "lighting": "day",
+      "stop_line": [
+        [
+          200,
+          460
+        ],
+        [
+          416,
+          464
+        ],
+        [
+          660,
+          470
+        ],
+        [
+          884,
+          478
+        ],
+        [
+          1152,
+          490
+        ],
+        [
+          1280,
+          497
+        ]
+      ],
+      "lane_dividers": [
+        416,
+        660,
+        884,
+        1152
+      ],
+      "signals": {
+        "method": "lamps",
+        "left": [
+          {
+            "red": [
+              647,
+              53
+            ],
+            "yellow": [
+              647,
+              67
+            ],
+            "green": [
+              647,
+              81
+            ]
+          }
+        ],
+        "through": [
+          {
+            "red": [
+              834,
+              74
+            ],
+            "yellow": [
+              834,
+              89
+            ],
+            "green": [
+              834,
+              103
+            ]
+          },
+          {
+            "red": [
+              985,
+              92
+            ],
+            "yellow": [
+              985,
+              107
+            ],
+            "green": [
+              985,
+              122
+            ]
+          }
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "E": {
+      "start": 1391,
+      "end": 1662,
+      "lighting": "night",
+      "stop_line": [
+        [
+          285,
+          413
+        ],
+        [
+          530,
+          417
+        ],
+        [
+          788,
+          422
+        ],
+        [
+          1048,
+          431
+        ],
+        [
+          1280,
+          446
+        ]
+      ],
+      "lane_dividers": [
+        530,
+        788,
+        1048,
+        1272
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            758,
+            0,
+            795,
+            48
+          ]
+        ],
+        "through": [
+          [
+            944,
+            0,
+            986,
+            70
+          ],
+          [
+            1094,
+            18,
+            1136,
+            90
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "F": {
+      "start": 1662,
+      "end": 1840,
+      "lighting": "night",
+      "role": "development",
+      "stop_line": [
+        [
+          290,
+          470
+        ],
+        [
+          466,
+          477
+        ],
+        [
+          619,
+          484
+        ],
+        [
+          989,
+          497
+        ],
+        [
+          1205,
+          508
+        ],
+        [
+          1278,
+          512
+        ]
+      ],
+      "lane_dividers": [
+        466,
+        720,
+        989,
+        1205
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            692,
+            50,
+            730,
+            110
+          ]
+        ],
+        "through": [
+          [
+            878,
+            68,
+            918,
+            132
+          ],
+          [
+            1030,
+            84,
+            1070,
+            148
+          ]
+        ]
+      },
+      "evaluable_x_max": 1280
+    },
+    "G": {
+      "start": 1840,
+      "end": 2336,
+      "lighting": "night",
+      "stop_line": [
+        [
+          285,
+          412
+        ],
+        [
+          532,
+          415
+        ],
+        [
+          788,
+          421
+        ],
+        [
+          1048,
+          430
+        ],
+        [
+          1280,
+          445
+        ]
+      ],
+      "lane_dividers": [
+        532,
+        788,
+        1048,
+        1272
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            758,
+            0,
+            795,
+            46
+          ]
+        ],
+        "through": [
+          [
+            944,
+            0,
+            986,
+            68
+          ],
+          [
+            1094,
+            16,
+            1136,
+            88
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "H": {
+      "start": 2336,
+      "end": 2964,
+      "lighting": "infrared",
+      "role": "development",
+      "stop_line": [
+        [
+          290,
+          478
+        ],
+        [
+          468,
+          484
+        ],
+        [
+          720,
+          492
+        ],
+        [
+          989,
+          502
+        ],
+        [
+          1205,
+          510
+        ],
+        [
+          1278,
+          512
+        ]
+      ],
+      "lane_dividers": [
+        468,
+        720,
+        989,
+        1205
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            692,
+            62,
+            730,
+            122
+          ]
+        ],
+        "through": [
+          [
+            878,
+            80,
+            918,
+            142
+          ],
+          [
+            1030,
+            98,
+            1070,
+            160
+          ]
+        ]
+      },
+      "evaluable_x_max": 1280
+    },
+    "I": {
+      "start": 2964,
+      "end": 3100,
+      "lighting": "night",
+      "stop_line": [
+        [
+          240,
+          451
+        ],
+        [
+          444,
+          452
+        ],
+        [
+          704,
+          461
+        ],
+        [
+          972,
+          470
+        ],
+        [
+          1192,
+          482
+        ],
+        [
+          1280,
+          488
+        ]
+      ],
+      "lane_dividers": [
+        444,
+        704,
+        972,
+        1192
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            678,
+            26,
+            716,
+            88
+          ]
+        ],
+        "through": [
+          [
+            865,
+            40,
+            906,
+            110
+          ],
+          [
+            1015,
+            60,
+            1056,
+            130
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "J": {
+      "start": 3100,
+      "end": 3305,
+      "lighting": "night",
+      "stop_line": [
+        [
+          208,
+          487
+        ],
+        [
+          432,
+          488
+        ],
+        [
+          688,
+          494
+        ],
+        [
+          950,
+          503
+        ],
+        [
+          1188,
+          516
+        ],
+        [
+          1280,
+          523
+        ]
+      ],
+      "lane_dividers": [
+        432,
+        688,
+        950,
+        1188
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            658,
+            60,
+            695,
+            124
+          ]
+        ],
+        "through": [
+          [
+            842,
+            72,
+            890,
+            140
+          ],
+          [
+            992,
+            92,
+            1040,
+            160
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "K": {
+      "start": 3305,
+      "end": 3664,
+      "lighting": "night",
+      "stop_line": [
+        [
+          224,
+          468
+        ],
+        [
+          472,
+          471
+        ],
+        [
+          728,
+          476
+        ],
+        [
+          988,
+          484
+        ],
+        [
+          1228,
+          496
+        ],
+        [
+          1280,
+          500
+        ]
+      ],
+      "lane_dividers": [
+        472,
+        728,
+        988,
+        1228
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            696,
+            42,
+            735,
+            104
+          ]
+        ],
+        "through": [
+          [
+            880,
+            52,
+            928,
+            122
+          ],
+          [
+            1030,
+            72,
+            1080,
+            142
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "L": {
+      "start": 3664,
+      "end": 3792,
+      "lighting": "night",
+      "stop_line": [
+        [
+          224,
+          468
+        ],
+        [
+          472,
+          471
+        ],
+        [
+          732,
+          476
+        ],
+        [
+          992,
+          484
+        ],
+        [
+          1228,
+          496
+        ],
+        [
+          1280,
+          500
+        ]
+      ],
+      "lane_dividers": [
+        472,
+        732,
+        992,
+        1228
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            696,
+            42,
+            735,
+            104
+          ]
+        ],
+        "through": [
+          [
+            880,
+            52,
+            928,
+            122
+          ],
+          [
+            1030,
+            70,
+            1080,
+            140
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "M": {
+      "start": 3792,
+      "end": 3952,
+      "lighting": "night",
+      "stop_line": [
+        [
+          256,
+          495
+        ],
+        [
+          480,
+          495
+        ],
+        [
+          736,
+          499
+        ],
+        [
+          996,
+          507
+        ],
+        [
+          1236,
+          519
+        ],
+        [
+          1280,
+          522
+        ]
+      ],
+      "lane_dividers": [
+        480,
+        736,
+        996,
+        1236
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            703,
+            64,
+            741,
+            130
+          ]
+        ],
+        "through": [
+          [
+            880,
+            85,
+            940,
+            155
+          ],
+          [
+            1030,
+            102,
+            1090,
+            175
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "N": {
+      "start": 3952,
+      "end": 4438,
+      "lighting": "night",
+      "stop_line": [
+        [
+          184,
+          486
+        ],
+        [
+          400,
+          487
+        ],
+        [
+          660,
+          492
+        ],
+        [
+          920,
+          500
+        ],
+        [
+          1160,
+          512
+        ],
+        [
+          1280,
+          520
+        ]
+      ],
+      "lane_dividers": [
+        400,
+        660,
+        920,
+        1160
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            630,
+            58,
+            668,
+            122
+          ]
+        ],
+        "through": [
+          [
+            814,
+            68,
+            862,
+            138
+          ],
+          [
+            964,
+            88,
+            1012,
+            158
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "O": {
+      "start": 4438,
+      "end": 4663,
+      "lighting": "night",
+      "stop_line": [
+        [
+          180,
+          402
+        ],
+        [
+          400,
+          406
+        ],
+        [
+          660,
+          412
+        ],
+        [
+          920,
+          422
+        ],
+        [
+          1156,
+          436
+        ],
+        [
+          1280,
+          447
+        ]
+      ],
+      "lane_dividers": [
+        400,
+        660,
+        920,
+        1156
+      ],
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            630,
+            0,
+            668,
+            40
+          ]
+        ],
+        "through": [
+          [
+            810,
+            6,
+            858,
+            70
+          ],
+          [
+            960,
+            26,
+            1008,
+            90
+          ]
+        ]
+      },
+      "role": "evaluation",
+      "evaluable_x_max": 1280
+    },
+    "P": {
+      "start": 4663,
+      "end": 4816,
+      "lighting": "night",
+      "stop_line": [
+        [
+          190,
+          456
+        ],
+        [
+          404,
+          462
+        ],
+        [
+          668,
+          468
+        ],
+        [
+          928,
+          476
+        ],
+        [
+          1180,
+          492
+        ]
+      ],
+      "lane_dividers": [
+        404,
+        668,
+        928,
+        1180
+      ],
+      "evaluable_x_max": 1050,
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            638,
+            30,
+            675,
+            92
+          ]
+        ],
+        "through": [
+          [
+            824,
+            40,
+            870,
+            112
+          ],
+          [
+            974,
+            60,
+            1022,
+            130
+          ]
+        ]
+      },
+      "role": "evaluation"
+    },
+    "Q": {
+      "start": 4816,
+      "end": 5094,
+      "lighting": "night",
+      "stop_line": [
+        [
+          232,
+          452
+        ],
+        [
+          484,
+          452
+        ],
+        [
+          744,
+          459
+        ],
+        [
+          1000,
+          468
+        ],
+        [
+          1200,
+          478
+        ]
+      ],
+      "lane_dividers": [
+        484,
+        744,
+        1000,
+        1200
+      ],
+      "evaluable_x_max": 1050,
+      "signals": {
+        "method": "head",
+        "left": [
+          [
+            712,
+            22,
+            750,
+            86
+          ]
+        ],
+        "through": [
+          [
+            896,
+            34,
+            946,
+            106
+          ],
+          [
+            1048,
+            54,
+            1098,
+            126
+          ]
+        ]
+      },
+      "role": "evaluation"
+    },
+    "R": {
+      "start": 5094,
+      "end": 5229,
+      "lighting": "day",
+      "stop_line": [
+        [
+          232,
+          456
+        ],
+        [
+          468,
+          460
+        ],
+        [
+          748,
+          470
+        ],
+        [
+          1032,
+          480
+        ],
+        [
+          1200,
+          490
+        ]
+      ],
+      "lane_dividers": [
+        468,
+        748,
+        1032,
+        1200
+      ],
+      "evaluable_x_max": 1050,
+      "signals": {
+        "method": "lamps",
+        "left": [
+          {
+            "red": [
+              737,
+              16
+            ],
+            "yellow": [
+              737,
+              30
+            ],
+            "green": [
+              737,
+              45
+            ]
+          }
+        ],
+        "through": [
+          {
+            "red": [
+              939,
+              41
+            ],
+            "yellow": [
+              939,
+              55
+            ],
+            "green": [
+              939,
+              69
+            ]
+          },
+          {
+            "red": [
+              1103,
+              62
+            ],
+            "yellow": [
+              1103,
+              76
+            ],
+            "green": [
+              1103,
+              90
+            ]
+          }
+        ]
+      },
+      "role": "evaluation"
+    }
+  }
+}
