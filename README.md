@@ -45,8 +45,8 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 
 | # | Notebook | Purpose | Status |
 | --- | --- | --- | --- |
-| 00 | `00_environment_and_dataset.ipynb` | Reproducible environment; inspect the sample videos | Done locally (GPU-server re-run pending) |
-| 01 | `01_video_reading.ipynb` | Video representation, metadata, frame access with OpenCV | Done locally (GPU-server re-run pending) |
+| 00 | `00_environment_and_dataset.ipynb` | Reproducible environment; inspect the sample videos | Done (verified locally and on the GPU server) |
+| 01 | `01_video_reading.ipynb` | Video representation, metadata, frame access with OpenCV | Done (verified locally and on the GPU server) |
 | 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections | Planned |
 | 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories (e.g. ByteTrack) | Planned |
 | 04 | `04_traffic_scene_configuration.ipynb` | ROI, lanes, stop lines, directions as machine-readable config | Planned |
@@ -120,9 +120,11 @@ Open `notebooks/00_environment_and_dataset.ipynb` and select the **Python (tvd)*
 
 Notebooks 00–01 (video reading) run on CPU. Object detection (Notebook 02 onward) is intended to run on a rented GPU server:
 
-1. Clone the repository on the server — the committed test clips in `data/` come with it.
-2. Create the same conda environment with the commands above.
+1. Copy the repository to the server, e.g. `rsync -az --chown=root:root --exclude outputs/ ./ <server>:/workspace/traffic-violation-detection-system/` (or `git clone`). The committed test clips in `data/` come with it.
+2. Create the same conda environment with the commands above. If `conda` is not on `PATH` (e.g. vast.ai images), run `source /opt/miniforge3/etc/profile.d/conda.sh` first.
 3. PyTorch and the detector package are added in Notebook 02, because the correct PyTorch build depends on the server's CUDA version (check it with `nvidia-smi`).
+
+Rented instances are often not persistent: copy notebooks and results back (e.g. with `rsync`) before stopping or destroying the instance.
 
 Notebook 00 records the Python version, package versions, and GPU availability of whichever machine runs it.
 
@@ -182,7 +184,7 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 Before starting:
 
 - [ ] Move the validated video-reading functions from Notebook 01 into `src/traffic_violation_detection/` with `pytest` tests.
-- [ ] Set up the conda environment on the GPU server and re-run Notebooks 00–01 there.
+- [x] Set up the conda environment on the GPU server (RTX 4090) and re-run Notebooks 00–01 there — all checks pass.
 
 Notebook 01 is complete on the development machine:
 
@@ -199,7 +201,7 @@ Notebook 00 is complete on the development machine:
 - [x] Visible objects and traffic behaviors documented.
 - [x] Suitability of the footage for violation detection assessed (preliminary).
 - [x] Environmental assumptions and limitations documented.
-- [ ] Re-run Notebook 00 on the GPU server.
+- [x] Re-run Notebook 00 on the GPU server.
 
 ## License
 
