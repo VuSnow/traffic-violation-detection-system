@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, violation detection) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `scene.py`). Next: **Notebook 06 — License Plate Recognition**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–05 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `scene.py`, `red_light.py`, `evidence.py`). Next: **Notebook 06 — License Plate Recognition**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -51,6 +51,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories; ByteTrack vs OC-SORT vs BoT-SORT | Done (GPU server) |
 | 04 | `04_traffic_scene_configuration.ipynb` | Camera registration; regions, lines, directions and signal as machine-readable config | Done (GPU server) |
 | 05 | `05_violation_detection.ipynb` | Wrong-way driving as an explicit, testable rule; no real violation found in the clip | Done (GPU server) |
+| 05b | `05b_red_light_violation.ipynb` | Red-light rule, frozen before evaluation, with precision and recall on labelled clips; one video clip per candidate as input to Notebook 06 | Done (GPU server); labels await human review |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR, with explicit unknown/unreadable state | Planned |
 | 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication | Planned |
 | 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Planned |
@@ -87,14 +88,26 @@ traffic-violation-detection-system/
 │   └── project_specification.md
 ├── notebooks/              # 00–09 experiment notebooks
 ├── configs/                # Scene and experiment configuration (from Notebook 04)
-├── data/                   # Input videos (small test clips are committed)
+├── data/                   # Input videos (small test clips are committed) and hand-made annotations
 ├── outputs/                # Generated frames, videos, evidence, events, evaluations (git-ignored)
+├── scripts/                # Repository tooling
 ├── src/
 │   └── traffic_violation_detection/   # Validated reusable modules
 └── tests/
 ```
 
-Generated outputs, model weights, and raw footage under `data/raw/` are git-ignored. Only the small test clips directly under `data/` are committed.
+Generated outputs, model weights, and any new video under `data/` are git-ignored. Only the three small test clips directly under `data/` and the annotations in `data/annotations/` are committed.
+
+### Image outputs stay local
+
+The images in Notebook 05b show real vehicles from third-party footage, unblurred, so they stay out of git. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
+
+```bash
+git config filter.strip-notebook-images.clean "python3 scripts/strip_notebook_images.py"
+git config filter.strip-notebook-images.required true
+```
+
+Git restores the stripped version if you check this notebook out again, so re-run it to get the images back. A full copy is kept in `outputs/05b_red_light_violation/`.
 
 ## Getting Started
 
@@ -153,6 +166,13 @@ Notebook 00 records the Python version, package versions, and GPU availability o
 
 Details, observations, and a suitability assessment per violation type are in Notebook 00. Use only videos you are permitted to use.
 
+Two further videos are used locally and **not committed**, so Notebook 05b needs them placed by hand:
+
+| File | Content | Role |
+| --- | --- | --- |
+| `data/raw/rlr_occasions.mp4` | Screen recording of a public YouTube compilation of red-light running: 18 clips of one junction, 1280×720, 30 FPS. Its reuse rights are unconfirmed. | Red-light rule and its evaluation (Notebook 05b) |
+| `data/traffic_video_modified.mp4` | Night traffic with a moving camera, 1920×1012, 26.33 FPS. **The signal is a graphic added to the footage**, so results on it are never real violations. | Logic test (Notebook 05b); plate reading (Notebook 06) |
+
 ## Candidate Technologies
 
 | Area | Initial direction |
@@ -162,7 +182,7 @@ Details, observations, and a suitability assessment per violation type are in No
 | Video processing | OpenCV, FFmpeg (when needed) |
 | Object detection | Ultralytics YOLO26m, COCO-pretrained, `imgsz=1280` (baseline chosen in Notebook 02). Ultralytics is **AGPL-3.0** licensed, unlike this MIT repository. |
 | Multi-object tracking | OC-SORT with ByteTrack-style low-score association, via BoxMOT (**AGPL-3.0**); chosen over ByteTrack and BoT-SORT in Notebook 03 |
-| Violation detection | Rule-based logic using tracked trajectories and scene configuration; wrong-way driving first (Notebook 05) |
+| Violation detection | Rule-based logic using tracked trajectories and scene configuration: wrong-way driving (Notebook 05) and red-light running (Notebook 05b) |
 | License plate recognition | Plate detection + OCR (to be evaluated in Notebook 06) |
 | API/backend | FastAPI (planned) |
 | Database | PostgreSQL (planned) |
@@ -194,9 +214,19 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 06: License Plate Recognition** (next). The most valuable addition to the project is footage with a real violation; see the requirements below.
+**Phase 1 / Notebook 06: License Plate Recognition** (next). The most valuable additions to the project are a person's review of the red-light labels, and footage of ordinary traffic with many legal crossings, for a fair measure of precision.
 
 Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
+
+Notebook 05b is complete on the GPU server:
+
+- [x] Red-light rule in `src/`, with tests, committed before its evaluation clips were labelled or run.
+- [x] 15 evaluation clips: precision 13/13 and recall 13/14. **All 18 clips, including a monochrome one the rule declines to judge: recall 15/21.**
+- [x] Signal reader: no wrong reading in 523 scored readings, though it gives no answer on monochrome footage or for the left signal by day.
+- [x] Logic test on a video with a synthetic signal: all 6 crossings behave as designed.
+- [x] One video clip per candidate, with original pixels, plus a manifest of the vehicle's box in each frame, as input to Notebook 06. In the night clips, fast vehicles are motion-blurred in the source, so their plates may not be readable.
+- [ ] **A new video needs its stop line and signal positions declared by hand first;** there is no single command yet that goes from a video to its clips.
+- [ ] **The labels were made by the AI assistant that wrote the rule, and await a person's review.** The footage was selected for violations (24 of 25 crossings on red, none on green), so these scores do not predict ordinary traffic.
 
 Notebook 05 is complete on the GPU server:
 
