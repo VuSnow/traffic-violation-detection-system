@@ -3,6 +3,7 @@
 import builtins
 import json
 import shutil
+import subprocess
 from pathlib import Path
 
 import cv2
@@ -11,7 +12,7 @@ import pytest
 
 from traffic_violation_detection import evidence
 from traffic_violation_detection.evidence import clip_frame_range, cut_event_clip, find_ffmpeg, write_clip
-from traffic_violation_detection.video import iter_frames, read_frame_at
+from traffic_violation_detection.video import read_frame_at
 
 VIDEO = Path(__file__).resolve().parents[1] / "data" / "traffic_sample.mp4"  # 640x360, 24 FPS, 240 frames
 FPS = 30.0
@@ -127,6 +128,40 @@ def test_failed_clip_leaves_no_file(tmp_path):
 def test_empty_clip_is_rejected(tmp_path):
     with pytest.raises(ValueError, match="Empty clip"):
         write_clip(VIDEO, 40, 40, tmp_path / "clip.mp4")
+
+
+def test_clip_without_an_end_runs_to_the_end_of_the_video(tmp_path):
+    out = tmp_path / "clip.mp4"
+    assert write_clip(VIDEO, 230, None, out) == 10
+    assert len(decoded(out)) == 10
+
+
+def test_error_while_drawing_leaves_no_file_and_is_reported(tmp_path):
+    def draw(image, frame_index):
+        if frame_index == 5:
+            raise ValueError("detector failed")
+
+    with pytest.raises(ValueError, match="detector failed"):
+        write_clip(VIDEO, 0, 20, tmp_path / "clip.mp4", draw=draw)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_video_of_odd_size_is_padded_to_even(tmp_path):
+    source = tmp_path / "odd.avi"
+    subprocess.run(
+        [find_ffmpeg(), "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=641x361:rate=10:duration=1", "-c:v", "ffv1", str(source)],
+        check=True,
+    )
+    out = tmp_path / "clip.mp4"
+    assert write_clip(source, 0, None, out) == 10
+    frames = decoded(out)
+    assert len(frames) == 10 and frames[0].shape[:2] == (362, 642)
+    # Compared on brightness, since this test pattern's sharp colours suffer from chroma subsampling.
+    luma = lambda image: cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    kept = luma(frames[3][:361, :641])
+    original = luma(read_frame_at(source, 3)["image"])
+    assert psnr(kept, original) >= 35
+    assert psnr(kept, original) > psnr(kept[1:, 1:], original[:-1, :-1])  # The padding did not shift the image.
 
 
 EVENT = {"event_id": "evt-test-f00100-t7", "trigger_frame": 100, "class_name": "car", "signal_source": "camera", "review_status": "pending"}

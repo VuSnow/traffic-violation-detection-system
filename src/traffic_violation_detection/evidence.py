@@ -52,46 +52,63 @@ def clip_frame_range(trigger_frame: int, track_start: int, fps: float, limit_sta
     return start, end
 
 
+def _encoder_command(width: int, height: int, fps: float, crf: int, out_path: Path) -> list[str]:
+    # H.264 in yuv420p needs even sizes, so an odd side gets one black row or column.
+    return [
+        find_ffmpeg(), "-y", "-loglevel", "error",
+        "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
+        "-an", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", "-c:v", "libx264", "-preset", "medium", "-crf", str(crf),
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(out_path),
+    ]
+
+
 def write_clip(
     video_path: str | Path,
     start: int,
-    end: int,
+    end: int | None,
     out_path: str | Path,
     crf: int = CLIP_SETTINGS["crf"],
     draw: Callable[[np.ndarray, int], None] | None = None,
 ) -> int:
     """Write frames ``[start, end)`` of a video as an H.264 file and return how many were written.
 
-    ``draw(image, frame_index)``, if given, may draw on each frame before it is encoded. The file
-    appears only when complete, so a failure leaves no partial clip behind.
+    With ``end=None`` it runs to the end of the video. ``draw(image, frame_index)``, if given, may
+    draw on each frame before it is encoded. The file appears only when complete, so a failure
+    leaves no partial clip behind.
     """
-    if end <= start:
+    if end is not None and end <= start:
         raise ValueError(f"Empty clip: start={start}, end={end}")
-    meta = read_video_metadata(video_path)
+    fps = read_video_metadata(video_path)["fps"]
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     partial = out_path.with_name(out_path.stem + ".partial.mp4")
-    command = [
-        find_ffmpeg(), "-y", "-loglevel", "error",
-        "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{meta['width']}x{meta['height']}", "-r", str(meta["fps"]), "-i", "-",
-        "-an", "-c:v", "libx264", "-preset", "medium", "-crf", str(crf), "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(partial),
-    ]
     written = 0
-    process = subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    process = None
     try:
         for record in iter_frames(video_path, start, end):
             image = record["image"]
             if draw is not None:
                 draw(image, record["frame_index"])
+            if process is None:
+                # The size comes from a decoded frame, which is what the encoder really receives.
+                height, width = image.shape[:2]
+                process = subprocess.Popen(_encoder_command(width, height, fps, crf, partial), stdin=subprocess.PIPE, stderr=subprocess.PIPE)
             process.stdin.write(image.tobytes())
             written += 1
     except BrokenPipeError:
         pass  # ffmpeg stopped early; its message is reported below.
-    finally:
-        _, errors = process.communicate()
-    if process.returncode != 0 or written != end - start:
+    except BaseException:
+        if process is not None:
+            process.kill()
+            process.communicate()
         partial.unlink(missing_ok=True)
-        raise RuntimeError(f"Clip {out_path.name}: wrote {written} of {end - start} frames. {errors.decode(errors='replace').strip()}")
+        raise
+    errors = process.communicate()[1] if process is not None else b""
+    complete = process is not None and process.returncode == 0 and (end is None or written == end - start)
+    if not complete:
+        partial.unlink(missing_ok=True)
+        wanted = "" if end is None else f" of {end - start}"
+        raise RuntimeError(f"Clip {out_path.name}: wrote {written}{wanted} frames. {errors.decode(errors='replace').strip()}")
     partial.replace(out_path)
     return written
 
