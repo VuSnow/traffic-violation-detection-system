@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "video_id": "rlr_occasions",
+  "scene_config": "configs/scenes/rlr_occasions.json",
+  "annotator": {
+    "kind": "ai_assistant",
+    "reviewed_by_a_person": false,
+    "method": "Claude read frames sampled every 20 frames (0.67 s) from each evaluation clip, with denser frames near the signal change for clips L, N and Q. The sheets showed the stop line and enlarged signal heads, and no tracker or rule output.",
+    "known_limits": [
+      "Not independent ground truth: the annotator also wrote the rule and declared the geometry, and had seen each clip's median image while doing so.",
+      "The source is a compilation of red-light running, so the annotator expected violations in most clips.",
+      "Frame and x are estimates read from images: about +/-10 frames and +/-60 px.",
+      "A fast vehicle could pass unnoticed between two samples, though every vehicle seen here stayed in view longer than that."
+    ]
+  },
+  "protocol": {
+    "violation": "The front of a vehicle crosses the stop line while the signal of its lane is red, and the vehicle continues into the junction. 'frame' is the estimated crossing of the front, and 'x' is the box center at that moment.",
+    "not_violation": "A notable case the rule should not flag: stopped with the front on the line, or entered on yellow. Listed so that a false positive can be named; any other unmatched candidate is a false positive too.",
+    "uncertain": "The truth cannot be determined from the video: for example a vehicle in the right-turn lane that leaves through the image edge, or a vehicle already across the line when the clip starts, when the signal at its entry is not visible. Excluded from precision and recall, and counted separately."
+  },
+  "matching": {
+    "max_frame_difference": 30,
+    "max_x_difference": 200,
+    "assignment": "Each label is matched to at most one candidate, in order of increasing frame difference.",
+    "true_positive": "A candidate matched to a 'violation' label.",
+    "false_positive": "A candidate matched to a 'not_violation' label, or to no label.",
+    "ignored": "A candidate matched to an 'uncertain' label.",
+    "false_negative": "A 'violation' label with no matched candidate."
+  },
+  "signal_scoring": "A reader's state is compared with the intervals below at the sampled frames (every 20 frames from the clip start). Frames outside every interval are in a signal change and are not scored.",
+  "clips": {
+    "A": {
+      "signal": {"through": [[79, 339, "red"]], "left": [[79, 339, "red"]]},
+      "events": [
+        {"id": "A1", "label": "violation", "frame": 150, "x": 700, "class": "car", "note": "Silver sedan continues straight across the junction."},
+        {"id": "A-u1", "label": "uncertain", "frame": 90, "x": 1210, "class": "car", "note": "Dark SUV in the right-turn lane, at the line when the clip starts, leaves through the right edge."},
+        {"id": "A-u2", "label": "uncertain", "frame": 200, "x": 1190, "class": "car", "note": "Grey SUV in the right-turn lane, leaves through the right edge."}
+      ]
+    },
+    "C": {
+      "signal": {"through": [[914, 994, "yellow"], [1014, 1114, "red"]], "left": [[914, 1114, "red"]]},
+      "events": [
+        {"id": "C1", "label": "violation", "frame": 1027, "x": 740, "class": "truck", "note": "White pickup, red for about 1 s."},
+        {"id": "C2", "label": "violation", "frame": 1058, "x": 340, "class": "truck", "note": "Second white pickup with a canopy, from the leftmost lane, continues straight."},
+        {"id": "C-n1", "label": "not_violation", "frame": 920, "x": 1260, "class": "car", "note": "Right-turn lane on yellow, at the right edge."}
+      ]
+    },
+    "D": {
+      "signal": {"through": [[1122, 1382, "red"]], "left": [[1122, 1382, "red"]]},
+      "events": [
+        {"id": "D1", "label": "violation", "frame": 1160, "x": 710, "class": "motorcycle", "note": "Motorcycle continues into the junction and collides with cross traffic."},
+        {"id": "D-n1", "label": "not_violation", "frame": 1165, "x": 960, "class": "car", "note": "Dark sedan stops with its front past the line and its rear before it, and stays there."},
+        {"id": "D-u1", "label": "uncertain", "frame": 1170, "x": 1240, "class": "car", "note": "White SUV in the right-turn lane, leaves through the right edge."},
+        {"id": "D-u2", "label": "uncertain", "frame": 1225, "x": 1220, "class": "car", "note": "Silver sedan in the right-turn lane, leaves through the right edge."},
+        {"id": "D-u3", "label": "uncertain", "frame": 1285, "x": 1235, "class": "car", "note": "Silver SUV in the right-turn lane, leaves through the right edge."}
+      ]
+    },
+    "E": {
+      "signal": {"through": [[1391, 1651, "red"]], "left": [[1391, 1651, "red"]]},
+      "events": [
+        {"id": "E1", "label": "violation", "frame": 1586, "x": 600, "class": "car", "note": "Red for over 6 s, continues straight."}
+      ]
+    },
+    "G": {
+      "signal": {"through": [[1840, 1960, "yellow"], [1980, 2320, "red"]], "left": [[1840, 2320, "red"]]},
+      "events": [
+        {"id": "G1", "label": "violation", "frame": 2030, "x": 450, "class": "truck", "note": "Pickup or SUV from the leftmost lane, continues straight."},
+        {"id": "G-n1", "label": "not_violation", "frame": 1955, "x": 1250, "class": "car", "note": "Dark car in the right-turn lane on yellow."}
+      ]
+    },
+    "I": {
+      "signal": {"through": [[2964, 3084, "red"]], "left": [[2964, 3084, "red"]]},
+      "events": [
+        {"id": "I-n1", "label": "not_violation", "frame": 3044, "x": 780, "class": "car", "note": "Sedan stops with its front about at the line."},
+        {"id": "I-u1", "label": "uncertain", "frame": 2964, "x": 1090, "class": "truck", "note": "White truck already past the line when the clip starts; the first frames are monochrome."},
+        {"id": "I-u2", "label": "uncertain", "frame": 2990, "x": 1250, "class": "car", "note": "White car in the right-turn lane, leaves through the right edge."},
+        {"id": "I-u3", "label": "uncertain", "frame": 3090, "x": 1240, "class": "car", "note": "Dark car in the right-turn lane reaches the line at the end of the clip."}
+      ]
+    },
+    "J": {
+      "signal": {"through": [[3100, 3140, "yellow"], [3160, 3300, "red"]], "left": [[3100, 3300, "red"]]},
+      "events": [
+        {"id": "J1", "label": "violation", "frame": 3247, "x": 730, "class": "car", "note": "Red for about 3 s, continues straight."}
+      ]
+    },
+    "K": {
+      "signal": {"through": [[3305, 3345, "yellow"], [3365, 3645, "red"]], "left": [[3305, 3645, "red"]]},
+      "events": [
+        {"id": "K1", "label": "violation", "frame": 3583, "x": 770, "class": "car", "note": "Dark SUV, red for about 7 s, continues straight."},
+        {"id": "K-n1", "label": "not_violation", "frame": 3318, "x": 753, "class": "car", "note": "Dark SUV crosses on yellow, before the signal turns red."}
+      ]
+    },
+    "L": {
+      "signal": {"through": [[3668, 3784, "red"]], "left": [[3664, 3784, "red"]]},
+      "events": [
+        {"id": "L1", "label": "violation", "frame": 3682, "x": 720, "class": "car", "note": "Close to the change: yellow at f3664, red by f3668, so red for about 0.5 s at entry."}
+      ]
+    },
+    "M": {
+      "signal": {"through": [[3792, 3852, "red"], [3892, 3932, "green"]], "left": [[3792, 3932, "red"]]},
+      "events": [
+        {"id": "M1", "label": "violation", "frame": 3833, "x": 1105, "class": "truck", "note": "Pickup crosses on red about 1 s before the through signal turns green."}
+      ]
+    },
+    "N": {
+      "signal": {"through": [[3952, 4046, "yellow"], [4058, 4152, "red"], [4172, 4252, "yellow"], [4272, 4432, "red"]], "left": [[3952, 4432, "red"]]},
+      "events": [
+        {"id": "N1", "label": "violation", "frame": 4067, "x": 1000, "class": "truck", "note": "Dark pickup, yellow at f4046 and red by f4058, so red for about 0.5 s at entry."},
+        {"id": "N2", "label": "violation", "frame": 4282, "x": 670, "class": "car", "note": "Dark sedan. The signal sequence shows a cut in this clip near f4160; red by f4272."}
+      ]
+    },
+    "O": {
+      "signal": {"through": [[4438, 4558, "yellow"], [4578, 4658, "red"]], "left": [[4438, 4658, "red"]]},
+      "events": [
+        {"id": "O1", "label": "violation", "frame": 4602, "x": 745, "class": "car", "note": "Dark sedan, red for about 1 s, continues straight."}
+      ]
+    },
+    "P": {
+      "signal": {"through": [[4663, 4803, "red"]], "left": [[4663, 4803, "red"]]},
+      "events": []
+    },
+    "Q": {
+      "signal": {"through": [[4816, 4939, "yellow"], [4944, 5076, "red"]], "left": [[4816, 5076, "red"]]},
+      "events": [
+        {"id": "Q1", "label": "violation", "frame": 4956, "x": 800, "class": "car", "note": "Close to the change: yellow at f4939, red by f4944, so red for about 0.4 s at entry."}
+      ]
+    },
+    "R": {
+      "signal": {"through": [[5094, 5214, "red"]], "left": [[5094, 5214, "red"]]},
+      "events": [
+        {"id": "R-n1", "label": "not_violation", "frame": 5094, "x": 892, "class": "car", "note": "Black coupe, stationary with its front past the line and its rear before it, for the whole clip."},
+        {"id": "R-u1", "label": "uncertain", "frame": 5097, "x": 600, "class": "car", "note": "Blue sedan with its front already across the line when the clip starts; the signal at its entry is not visible. It continues into a collision."}
+      ]
+    }
+  }
+}
