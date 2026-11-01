@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "scene_id": "video-test",
+  "video": {
+    "file": "data/video-test.mp4",
+    "width": 1920,
+    "height": 1080
+  },
+  "coordinates": {
+    "system": "reference_frame_pixels",
+    "reference_frame_index": 450,
+    "origin": "top-left, y down",
+    "frame_transforms": "outputs/04_traffic_scene_configuration/video-test.camera_motion.json",
+    "always_visible_xyxy": [
+      13.0,
+      39.0,
+      1860.0,
+      993.0
+    ]
+  },
+  "vanishing_point": [
+    930.2,
+    113.9
+  ],
+  "regions": [
+    {
+      "id": "left_carriageway",
+      "kind": "carriageway",
+      "polygon": [
+        [
+          733,
+          247
+        ],
+        [
+          930,
+          250
+        ],
+        [
+          931,
+          380
+        ],
+        [
+          556,
+          369
+        ]
+      ],
+      "allowed_direction": "toward_camera",
+      "direction_tolerance_deg": 60,
+      "description": "Lanes left of the center line, between the far and near dashed rows"
+    },
+    {
+      "id": "right_carriageway",
+      "kind": "carriageway",
+      "polygon": [
+        [
+          934,
+          250
+        ],
+        [
+          1125,
+          254
+        ],
+        [
+          1535,
+          540
+        ],
+        [
+          937,
+          540
+        ]
+      ],
+      "allowed_direction": "away_from_camera",
+      "direction_tolerance_deg": 60,
+      "description": "Lanes right of the center line, from the far row down to the end of the center line"
+    },
+    {
+      "id": "junction",
+      "kind": "junction",
+      "polygon": [
+        [
+          440,
+          365
+        ],
+        [
+          931,
+          380
+        ],
+        [
+          937,
+          540
+        ],
+        [
+          1535,
+          540
+        ],
+        [
+          1855,
+          700
+        ],
+        [
+          1855,
+          990
+        ],
+        [
+          15,
+          990
+        ],
+        [
+          15,
+          800
+        ],
+        [
+          100,
+          720
+        ],
+        [
+          100,
+          520
+        ],
+        [
+          60,
+          405
+        ],
+        [
+          300,
+          400
+        ]
+      ],
+      "allowed_direction": null,
+      "direction_tolerance_deg": null,
+      "description": "Wide marking-free area; flows turn and cross here, so no direction applies"
+    },
+    {
+      "id": "parking_left",
+      "kind": "excluded",
+      "polygon": [
+        [
+          733,
+          244
+        ],
+        [
+          556,
+          369
+        ],
+        [
+          440,
+          365
+        ],
+        [
+          440,
+          244
+        ]
+      ],
+      "allowed_direction": null,
+      "direction_tolerance_deg": null,
+      "description": "Parked cars left of the left edge line"
+    },
+    {
+      "id": "parking_right",
+      "kind": "excluded",
+      "polygon": [
+        [
+          1125,
+          254
+        ],
+        [
+          1535,
+          540
+        ],
+        [
+          1855,
+          700
+        ],
+        [
+          1855,
+          254
+        ]
+      ],
+      "allowed_direction": null,
+      "direction_tolerance_deg": null,
+      "description": "Parked vehicles and sidewalk right of the right edge line"
+    },
+    {
+      "id": "far_zone",
+      "kind": "far_zone",
+      "polygon": [
+        [
+          740,
+          160
+        ],
+        [
+          1125,
+          160
+        ],
+        [
+          1125,
+          254
+        ],
+        [
+          740,
+          244
+        ]
+      ],
+      "allowed_direction": null,
+      "direction_tolerance_deg": null,
+      "description": "Road beyond the far row; vehicles are small and the tracker often loses them, so no rule is applied"
+    }
+  ],
+  "lines": [
+    {
+      "id": "center_line",
+      "kind": "double_yellow",
+      "points": [
+        [
+          930,
+          250
+        ],
+        [
+          933,
+          540
+        ]
+      ],
+      "description": "Double yellow center line separating the carriageways"
+    },
+    {
+      "id": "far_row",
+      "kind": "transverse_dashed",
+      "points": [
+        [
+          740,
+          244
+        ],
+        [
+          1125,
+          254
+        ]
+      ],
+      "description": "Dashed row across the road; visible at x <= 940, extrapolated across the right carriageway, where queues hide it"
+    },
+    {
+      "id": "near_row",
+      "kind": "transverse_dashed",
+      "points": [
+        [
+          440,
+          365
+        ],
+        [
+          1310,
+          392
+        ]
+      ],
+      "description": "Dashed row at the entrance of the junction"
+    },
+    {
+      "id": "left_edge",
+      "kind": "edge_line",
+      "points": [
+        [
+          733,
+          247
+        ],
+        [
+          556,
+          365
+        ]
+      ],
+      "description": "Solid edge line extended upward"
+    },
+    {
+      "id": "right_edge",
+      "kind": "edge_line",
+      "points": [
+        [
+          1125,
+          250
+        ],
+        [
+          1535,
+          540
+        ]
+      ],
+      "description": "Solid edge line separating lanes from parking"
+    }
+  ],
+  "signals": [
+    {
+      "id": "signal_main",
+      "roi_xyxy": [
+        1138,
+        68,
+        1195,
+        96
+      ],
+      "faces": "camera",
+      "governs_regions": [
+        "right_carriageway"
+      ],
+      "governs_status": "unverified",
+      "description": "Signal heads mounted beyond the far row, facing the camera"
+    }
+  ],
+  "assumptions": [
+    "Geometry is in pixels of the reference frame; the camera is not calibrated, so it gives no metric distances or speeds.",
+    "Scene geometry is valid only for this clip and this camera position.",
+    "The legal meaning of the transverse dashed rows is unknown; neither is asserted to be a stop line.",
+    "signal_main faces traffic moving away from the camera, so it is assumed to govern the right carriageway. Notebook 04 could not confirm this from the data: the status is 'unverified'.",
+    "No signal facing the left carriageway is visible, so its signal state is unobservable in this video."
+  ]
+}

@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–03 (environment & dataset, video reading, object detection, multi-object tracking) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 04 — Traffic Scene Configuration**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–04 (environment & dataset, video reading, object detection, multi-object tracking, scene configuration) are done and verified on the GPU server; the validated video reader lives in `src/traffic_violation_detection/video.py`. Next: **Notebook 05 — Violation Detection**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -49,7 +49,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 01 | `01_video_reading.ipynb` | Video representation, metadata, frame access with OpenCV | Done (verified locally and on the GPU server) |
 | 02 | `02_object_detection.ipynb` | Pretrained detector, structured detections | Done (GPU server) |
 | 03 | `03_multi_object_tracking.ipynb` | Track IDs and per-vehicle trajectories; ByteTrack vs OC-SORT vs BoT-SORT | Done (GPU server) |
-| 04 | `04_traffic_scene_configuration.ipynb` | ROI, lanes, stop lines, directions as machine-readable config | Planned |
+| 04 | `04_traffic_scene_configuration.ipynb` | Camera registration; regions, lines, directions and signal as machine-readable config | Done (GPU server) |
 | 05 | `05_violation_detection.ipynb` | One feasible violation type as an explicit, testable rule | Planned |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR, with explicit unknown/unreadable state | Planned |
 | 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication | Planned |
@@ -194,7 +194,14 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 04: Traffic Scene Configuration** (next) — inputs: the baseline tracks and trajectories in `outputs/03_multi_object_tracking/tracks/` (regenerate them by running Notebooks 02–03 on the GPU server). The camera drift found in Notebook 00 (≈110 px) must be handled before drawing stop lines or lanes.
+**Phase 1 / Notebook 05: Violation Detection** (next) — inputs: `configs/scenes/video-test.json` and the reference-coordinate trajectories, camera motion and signal states in `outputs/04_traffic_scene_configuration/` (regenerate them by running Notebooks 02–04 on the GPU server). First candidate: wrong-way driving on the two carriageways.
+
+Notebook 04 is complete on the GPU server:
+
+- [x] Every frame registered to a reference frame (similarity transform, chosen over a homography by measured residuals).
+- [x] Scene configuration saved to `configs/scenes/video-test.json`, loaded through a validator, and checked against raw frames.
+- [x] Allowed directions compared with observed traffic: 89% of moving segments agree on the right carriageway; the left carriageway has too little data.
+- [x] Signal state read per frame. **Which traffic the signal governs could not be confirmed, so a red-light rule is not supported by this clip.**
 
 Notebook 03 is complete on the GPU server:
 
