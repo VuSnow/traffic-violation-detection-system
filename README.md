@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–07 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition, event generation) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`, `events.py`). Next: **Notebook 08 — End-to-End Baseline**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–08 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition, event generation, end-to-end baseline) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`, `events.py`, `pipeline.py`). Next: **Notebook 09 — Evaluation & Baseline Analysis**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -54,7 +54,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 05b | `05b_red_light_violation.ipynb` | Red-light rule, frozen before evaluation, with precision and recall on labelled clips; one video clip per candidate as input to Notebook 06 | Done (GPU server); labels await human review |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR over several frames, with explicit unknown/unreadable states | Done (GPU server); labels await human review |
 | 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication, simulated review, database interface | Done (GPU server) |
-| 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Planned |
+| 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Done (GPU server) |
 | 09 | `09_baseline_evaluation.ipynb` | Measured quality, error analysis, Phase 2 priorities | Planned |
 
 ### Phase 2 — Model Training & Optimization
@@ -101,7 +101,7 @@ Generated outputs, model weights, and any new video under `data/` are git-ignore
 
 ### Image outputs stay local
 
-The images in Notebooks 05b, 06 and 07 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebooks 06 and 07 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
+The images in Notebooks 05b, 06, 07 and 08 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebooks 06, 07 and 08 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
 
 ```bash
 git config filter.strip-notebook-images.clean "python3 scripts/strip_notebook_images.py"
@@ -138,6 +138,18 @@ pytest
 ```
 
 The tests decode the committed clips in `data/` and compare every frame-access path against reference frame hashes; they take well under a minute on the GPU server.
+
+### Processing a video from start to finish
+
+```python
+from traffic_violation_detection.pipeline import run_pipeline
+
+result = run_pipeline("video.mp4", "outputs/run", "configs/scenes/scene.json")
+```
+
+The scene configuration chooses the rule. The folder receives `<video name>_output.mp4`, the annotated video with each event's plate, and `<video name>_summary.json`, with what happened and how long each step took. Each step's outputs are in `violations/`, `plates/` and `events/`, including one clip per event.
+
+Every record stays `pending`, and nothing is stored, unless a `review` function is passed. That function stands in for a person, and `run_pipeline` never confirms a violation by itself. If plates cannot be read, the violations are kept, and the records and summary say so.
 
 ### Running a step on a video
 
@@ -259,9 +271,17 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 08: End-to-End Baseline** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
+**Phase 1 / Notebook 09: Evaluation & Baseline Analysis** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
 
 Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
+
+Notebook 08 is complete on the GPU server:
+
+- [x] `run_pipeline` takes a video from start to finish, on three videos with two rules, and matches the results of the notebooks step by step.
+- [x] Every event keeps one id through all steps, and a repeated run gives identical records.
+- [x] A failed plate step keeps the violations and reports it, an unreadable signal gives no candidate, and bad input is refused before any slow step.
+- [ ] **Not real time:** 0.12× to 0.68× the speed of the video on an RTX 4090. Camera motion is the bottleneck on a moving camera.
+- [ ] **A wrong scene configuration is not detected.** The rule reads whatever is at the declared position.
 
 Notebook 07 is complete on the GPU server:
 
