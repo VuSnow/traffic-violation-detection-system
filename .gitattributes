@@ -2,3 +2,4 @@
 notebooks/05b_red_light_violation.ipynb filter=strip-notebook-images
 notebooks/06_license_plate_recognition.ipynb filter=strip-notebook-images
 notebooks/07_violation_event_generation.ipynb filter=strip-notebook-images
+notebooks/08_end_to_end_baseline.ipynb filter=strip-notebook-images

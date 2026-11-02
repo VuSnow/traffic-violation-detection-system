@@ -350,6 +350,9 @@ class SqliteViolationStore:
     def count(self) -> int:
         return self.connection.execute("SELECT COUNT(*) FROM violations").fetchone()[0]
 
+    def close(self) -> None:
+        self.connection.close()
+
 
 def plate_caption(plate: dict) -> str:
     """A plate result in the words of a review video. A question mark says it is only a suggestion."""

@@ -1,10 +1,13 @@
 """Tests for traffic_violation_detection.camera, on small videos of a textured background."""
 
+import os
+
 import cv2
 import numpy as np
 import pytest
 from fakes import write_video
 
+from traffic_violation_detection import camera
 from traffic_violation_detection.camera import estimate_camera_motion, static_mask
 
 SIZE = (480, 360)
@@ -84,6 +87,25 @@ def test_unmatched_frame_keeps_the_previous_transform_and_warns(tmp_path):
     with pytest.warns(UserWarning, match="1 of 4 frames could not be matched"):
         params = estimate_camera_motion(write_video(tmp_path / "v.mp4", frames), [[] for _ in frames], reference_frame=0)
     assert params[2].tolist() == params[1].tolist()
+
+
+def test_opencv_threads_are_raised_for_the_work_and_restored_after(tmp_path, monkeypatch):
+    seen = []
+    real = camera.fit_similarity
+
+    def spy(*arguments):
+        seen.append(cv2.getNumThreads())
+        return real(*arguments)
+
+    monkeypatch.setattr(camera, "fit_similarity", spy)
+    frames = [view(texture(), 0, 0)] * 2
+    before = cv2.getNumThreads()
+    cv2.setNumThreads(1)
+    try:
+        estimate_camera_motion(write_video(tmp_path / "v.mp4", frames), [[], []], 0)
+        assert cv2.getNumThreads() == 1 and min(seen) >= min(2, os.cpu_count())
+    finally:
+        cv2.setNumThreads(before)
 
 
 def test_reference_frame_outside_the_video_is_rejected(tmp_path):

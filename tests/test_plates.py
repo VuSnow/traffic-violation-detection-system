@@ -376,7 +376,7 @@ def test_no_real_plate_from_the_private_labels_appears_in_committed_tests_or_cod
     videos = json.loads(labels_path.read_text())["videos"].values()
     real = {t["text"] for video in videos for t in video["tracks"].values() if "text" in t}
     committed = [Path(__file__).read_text(), (root / "src" / "traffic_violation_detection" / "plates.py").read_text(), (root / "README.md").read_text()]
-    for name in ("06_license_plate_recognition", "07_violation_event_generation"):
+    for name in ("06_license_plate_recognition", "07_violation_event_generation", "08_end_to_end_baseline"):
         notebook_path = root / "notebooks" / f"{name}.ipynb"
         if notebook_path.exists():
             # Only text is checked. Image outputs are stripped on commit, and their encoded bytes could match by chance.

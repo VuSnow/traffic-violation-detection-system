@@ -6,6 +6,7 @@ masked out. Each frame is matched directly to the reference, which avoids accumu
 
 from __future__ import annotations
 
+import os
 import warnings
 from pathlib import Path
 
@@ -20,6 +21,7 @@ RATIO_TEST = 0.75
 RANSAC_THRESHOLD = 2.0
 IDENTITY = (1.0, 0.0, 0.0, 0.0)
 STATIC_CLASSES = {"traffic light"}  # Part of the scene, so they stay usable.
+MAX_THREADS = 32
 
 
 def static_mask(shape: tuple[int, int], detections: list[dict], margin: int = MASK_MARGIN, excluded_areas=()) -> np.ndarray:
@@ -61,6 +63,17 @@ def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[lis
     """
     if not 0 <= reference_frame < len(detections_by_frame):
         raise ValueError(f"Reference frame {reference_frame} is outside the video's {len(detections_by_frame)} frames")
+    # Importing Ultralytics leaves OpenCV on one thread. This step then takes about 4 times longer, with the same result.
+    previous_threads = cv2.getNumThreads()
+    cv2.setNumThreads(min(MAX_THREADS, os.cpu_count() or 1))
+    try:
+        return register_frames(video_path, detections_by_frame, reference_frame, excluded_areas)
+    finally:
+        cv2.setNumThreads(previous_threads)
+
+
+def register_frames(video_path: str | Path, detections_by_frame: list[list[dict]], reference_frame: int, excluded_areas) -> np.ndarray:
+    """Match every frame to the reference frame. This is the work of ``estimate_camera_motion``."""
     orb = cv2.ORB_create(ORB_FEATURES)
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
     gray = cv2.cvtColor(read_frame_at(video_path, reference_frame)["image"], cv2.COLOR_BGR2GRAY)
@@ -78,5 +91,5 @@ def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[lis
         current = fitted if fitted is not None else current
         params[k] = current
     if unmatched:
-        warnings.warn(f"Camera motion: {unmatched} of {len(params)} frames could not be matched and reuse the previous transform.", stacklevel=2)
+        warnings.warn(f"Camera motion: {unmatched} of {len(params)} frames could not be matched and reuse the previous transform.", stacklevel=3)
     return params
