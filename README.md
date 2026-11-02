@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–06 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`). Next: **Notebook 07 — Violation Event Generation**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–07 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition, event generation) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`, `events.py`). Next: **Notebook 08 — End-to-End Baseline**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -53,7 +53,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 05 | `05_violation_detection.ipynb` | Wrong-way driving as an explicit, testable rule; no real violation found in the clip | Done (GPU server) |
 | 05b | `05b_red_light_violation.ipynb` | Red-light rule, frozen before evaluation, with precision and recall on labelled clips; one video clip per candidate as input to Notebook 06 | Done (GPU server); labels await human review |
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR over several frames, with explicit unknown/unreadable states | Done (GPU server); labels await human review |
-| 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication | Planned |
+| 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication, simulated review, database interface | Done (GPU server) |
 | 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Planned |
 | 09 | `09_baseline_evaluation.ipynb` | Measured quality, error analysis, Phase 2 priorities | Planned |
 
@@ -85,7 +85,8 @@ traffic-violation-detection-system/
 ├── pyproject.toml          # Python package + dependencies
 ├── environment.yml         # Conda environment (Python version)
 ├── docs/
-│   └── project_specification.md
+│   ├── project_specification.md
+│   └── event_schema.md
 ├── notebooks/              # 00–09 experiment notebooks
 ├── configs/                # Scene and experiment configuration (from Notebook 04)
 ├── data/                   # Input videos (small test clips are committed) and hand-made annotations
@@ -100,7 +101,7 @@ Generated outputs, model weights, and any new video under `data/` are git-ignore
 
 ### Image outputs stay local
 
-The images in Notebooks 05b and 06 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebook 06 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
+The images in Notebooks 05b, 06 and 07 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebooks 06 and 07 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
 
 ```bash
 git config filter.strip-notebook-images.clean "python3 scripts/strip_notebook_images.py"
@@ -144,6 +145,7 @@ Each step is a set of small functions, one per task, with one function at the en
 
 ```python
 from traffic_violation_detection.detection import annotate_video
+from traffic_violation_detection.events import generate_review_events
 from traffic_violation_detection.plates import read_plates_from_clips, read_plates_video
 from traffic_violation_detection.red_light import detect_red_light_video
 from traffic_violation_detection.tracking import track_video
@@ -159,6 +161,9 @@ detect_red_light_video("video.mp4", "outputs/red_light", "configs/scenes/scene.j
 
 # The plate of each candidate violation, from the clips of a violation step.
 read_plates_from_clips("outputs/red_light/video_violation_clips/manifest.json", "outputs/violation_plates")
+
+# Records ready for a person's review, from the outputs above.
+generate_review_events("video.mp4", "outputs/events", "outputs/red_light", "outputs/violation_plates/plates.json")
 ```
 
 | Function | Module | Also saves |
@@ -169,6 +174,7 @@ read_plates_from_clips("outputs/red_light/video_violation_clips/manifest.json", 
 | `detect_wrong_way_video` | `wrong_way.py` | `<video name>_violation_clips/`, `<video name>_events.json` |
 | `detect_red_light_video` | `red_light.py` | `<video name>_violation_clips/`, `<video name>_events.json` |
 | `read_plates_from_clips` | `plates.py` | `<event id>_output.mp4` for each event, `plate_crops/`, `plates.json` |
+| `generate_review_events` | `events.py` | `<video name>_review_events.json`, `evidence/`; its video shows all events in turn |
 
 - **Use one folder per step.** The steps save the same file name, so a shared folder would overwrite the earlier video.
 - **Violation clips are the input to plate reading.** There is one per candidate, with original pixels, and `manifest.json` gives the vehicle's box in each frame. Output videos have drawings on them and are for viewing.
@@ -253,22 +259,31 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 07: Violation Event Generation** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
+**Phase 1 / Notebook 08: End-to-End Baseline** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
 
 Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
+
+Notebook 07 is complete on the GPU server:
+
+- [x] One record for every violation type, documented in `docs/event_schema.md`, with the reason, times, vehicle, plate, evidence and what needs a reviewer's attention.
+- [x] 19 records, all `pending`, and 10 kinds of broken record caught. Duplicates are merged only when the same track or a plate read with certainty shows one vehicle.
+- [x] `decide` is the only way out of `pending`, and only a decided, approved record can reach the database interface.
+- [ ] **The review is scripted, not made by a person,** so its "confirmed" records only test the contract.
+- [ ] **Records hold no camera identity, location or date,** which a real case needs and test videos do not provide.
 
 Notebook 06 is complete on the GPU server:
 
 - [x] A plate is read from 12 frames and the reads are compared. Each vehicle ends as `read`, `uncertain`, `unreadable` or `no_plate_found`.
 - [x] Evaluation video, with settings committed first: no wrong `read`, and no text invented for the 35 tracks unreadable by eye. 6 of 14 readable tracks got a correct `read`. **All 6 are among tracks whose OCR output was seen before labelling, so this is not independent confirmation.**
 - [x] `read_plates_video` and `read_plates_from_clips` join the small functions into one call each.
-- [x] The whole chain on a simulated signal, with a graphic treated as the real signal: 9 crossings judged, 1 car flagged on red, and its plate read from its clip with 9 of 9 frames agreeing. By eye, 1 other car crossed on red and was missed, because its track broke while the flagged car hid it.
-- [ ] **No plate could be read in the 16 clips of candidate violations:** they are too small and blurred in the source. Each event states this explicitly.
+- [x] The whole chain on a simulated signal, with a graphic treated as the real signal: 11 crossings judged, 2 cars flagged on red, and both plates read from their clips, matching what can be read by eye.
+- [ ] **No plate could be read in the 17 clips of candidate violations:** they are too small and blurred in the source. Each event states this explicitly.
 - [ ] **The plate labels were made by the AI assistant that wrote the code, and await a person's review.**
 
 Notebook 05b is complete on the GPU server:
 
 - [x] Red-light rule in `src/`, with tests, committed before its evaluation clips were labelled or run.
+- [x] Rule version 2 handles a broken track: it joins tracks that plainly continue each other, and estimates the entry of a hidden vehicle. It fixes the one miss on the evaluation clips, 14 of 14, but that miss was known when it was written, so this is **not a fair test**. The scores below are version 1.
 - [x] 15 evaluation clips: precision 13/13 and recall 13/14. **All 18 clips, including a monochrome one the rule declines to judge: recall 15/21.**
 - [x] Signal reader: no wrong reading in 523 scored readings, though it gives no answer on monochrome footage or for the left signal by day.
 - [x] Logic test on a video with a synthetic signal: all 6 crossings behave as designed.
