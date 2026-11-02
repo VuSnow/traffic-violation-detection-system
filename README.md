@@ -309,6 +309,7 @@ Notebook 05b is complete on the GPU server:
 - [x] Logic test on a video with a synthetic signal: all 6 crossings behave as designed.
 - [x] One video clip per candidate, with original pixels, plus a manifest of the vehicle's box in each frame, as input to Notebook 06. In the night clips, fast vehicles are motion-blurred in the source, so their plates may not be readable.
 - [x] `detect_red_light_video` joins every step into one call, and reproduces all 16 candidates and the same scores.
+- [ ] **Some vehicles get a track late, or never.** The tracker starts a track only from a detection of at least 0.6, BoxMOT's default `det_thresh`. In the dim, blurred clip H, one car's track began after it had crossed the line, and another car never got a track. A lower threshold gives far more tracks, and has not been tested on the evaluation clips.
 - [ ] **A new video needs its stop line and signal positions declared by hand first.**
 - [ ] **The labels were made by the AI assistant that wrote the rule, and await a person's review.** The footage was selected for violations (24 of 25 crossings on red, none on green), so these scores do not predict ordinary traffic.
 

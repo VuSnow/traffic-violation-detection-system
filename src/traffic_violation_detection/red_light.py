@@ -309,6 +309,9 @@ def deduplicate(records: list[dict], fps: float, rule: dict = RULE) -> list[dict
     return kept
 
 
+LATE_TRACK_FRAMES, LATE_TRACK_X = 60, 100
+
+
 def score_candidates(candidates: list[dict], events: list[dict], max_frame_difference: int, max_x_difference: float) -> dict:
     """Match candidates to labelled events one-to-one, closest in time first, and sort them into outcomes.
 
@@ -338,6 +341,32 @@ def score_candidates(candidates: list[dict], events: list[dict], max_frame_diffe
             outcome["false_positives"].append((candidate, event))
     outcome["false_negatives"] = [e for j, e in enumerate(events) if e["label"] == "violation" and j not in used]
     return outcome
+
+
+def match_labels_to_crossings(events: list[dict], records: list[dict], max_frame_difference: int, max_x_difference: float) -> dict[str, dict]:
+    """The crossing record of each labelled vehicle, by label id. Each record goes to one label, closest in time first.
+
+    A label left over may then take a leftover record that comes up to ``LATE_TRACK_FRAMES`` later and
+    within ``LATE_TRACK_X``: a vehicle first tracked past the line gets its record only at that moment.
+    """
+    matched: dict[str, dict] = {}
+    used: set[int] = set()
+
+    def assign(is_near) -> None:
+        pairs = sorted(
+            (abs(r["frame"] - e["frame"]), abs(r["x"] - e["x"]), i, j)
+            for i, e in enumerate(events)
+            for j, r in enumerate(records)
+            if is_near(e, r)
+        )
+        for _, _, i, j in pairs:
+            if events[i]["id"] not in matched and j not in used:
+                matched[events[i]["id"]] = records[j]
+                used.add(j)
+
+    assign(lambda e, r: abs(r["frame"] - e["frame"]) <= max_frame_difference and abs(r["x"] - e["x"]) <= max_x_difference)
+    assign(lambda e, r: 0 <= r["frame"] - e["frame"] <= LATE_TRACK_FRAMES and abs(r["x"] - e["x"]) <= LATE_TRACK_X)
+    return matched
 
 
 def build_event(record: dict, clip_name: str, video_id: str, fps: float, clip_start: int, signal_source: str = "camera", rule: dict = RULE) -> dict:

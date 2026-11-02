@@ -24,6 +24,7 @@ from traffic_violation_detection.red_light import (
     lane_of,
     line_y,
     load_red_light_scene,
+    match_labels_to_crossings,
     movement_after,
     read_group_state,
     read_head_state,
@@ -403,3 +404,46 @@ def test_broken_scenes_are_rejected(tmp_path, mutate, message):
     path.write_text(json.dumps(broken))
     with pytest.raises(ValueError, match=message):
         load_red_light_scene(path, W, H)
+
+
+# The labels and crossing records of clip H, where two labels once took the same vehicle's record.
+H_LABELS = [
+    {"id": "H1", "frame": 2565, "x": 1080},
+    {"id": "H2", "frame": 2590, "x": 880},
+    {"id": "H3", "frame": 2590, "x": 620},
+    {"id": "H4", "frame": 2762, "x": 810},
+    {"id": "H5", "frame": 2787, "x": 560},
+]
+H_CROSSINGS = [
+    {"track_id": "1", "frame": 2569, "x": 1077},
+    {"track_id": "5", "frame": 2607, "x": 629},
+    {"track_id": "7", "frame": 2643, "x": 928},
+    {"track_id": "8", "frame": 2761, "x": 813},
+]
+
+
+def test_each_labelled_vehicle_gets_its_own_crossing():
+    matched = match_labels_to_crossings(H_LABELS, H_CROSSINGS, 30, 200)
+    assert {label: record["track_id"] for label, record in matched.items()} == {"H1": "1", "H2": "7", "H3": "5", "H4": "8"}
+
+
+def test_a_vehicle_with_no_crossing_is_left_out():
+    assert "H5" not in match_labels_to_crossings(H_LABELS, H_CROSSINGS, 30, 200)
+
+
+def test_the_closest_label_keeps_a_crossing_that_two_labels_are_near():
+    labels = [{"id": "far", "frame": 120, "x": 100}, {"id": "near", "frame": 101, "x": 100}]
+    assert list(match_labels_to_crossings(labels, [{"track_id": "1", "frame": 100, "x": 100}], 30, 200)) == ["near"]
+
+
+def test_a_track_that_starts_after_the_crossing_can_be_matched():
+    records = [{"track_id": "1", "frame": 150, "x": 100}]
+    assert match_labels_to_crossings([{"id": "a", "frame": 100, "x": 100}], records, 30, 200)["a"] == records[0]
+
+
+@pytest.mark.parametrize(
+    "label",
+    [{"id": "too_late", "frame": 100, "x": 100}, {"id": "far_in_x", "frame": 130, "x": 300}, {"id": "before_the_label", "frame": 200, "x": 100}],
+)
+def test_a_late_track_must_be_close_and_after_the_label(label):
+    assert match_labels_to_crossings([label], [{"track_id": "1", "frame": 161 if label["id"] == "too_late" else 150, "x": 100}], 30, 150) == {}
