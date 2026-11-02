@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–06 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`). Next: **Notebook 07 — Violation Event Generation**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–06 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`). Next: **Notebook 07 — Violation Event Generation**.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -173,8 +173,9 @@ read_plates_from_clips("outputs/red_light/video_violation_clips/manifest.json", 
 - **Use one folder per step.** The steps save the same file name, so a shared folder would overwrite the earlier video.
 - **Violation clips are the input to plate reading.** There is one per candidate, with original pixels, and `manifest.json` gives the vehicle's box in each frame. Output videos have drawings on them and are for viewing.
 - **Candidates are never verdicts.** Every event is `pending` until a person reviews it.
+- **A scene can describe a moving camera, oncoming traffic and a simulated signal.** `configs/scenes/traffic_video_modified.json` does all three. Its events carry `signal_source: simulated_overlay`.
 - **Plate results say how sure they are:** `read`, `uncertain`, `unreadable` or `no_plate_found`. A text marked `uncertain` is only a hint.
-- **Requirements.** These need the `detection` and `tracking` extras, and the `plates` extra for plate reading. Detection uses a GPU when one is available, while the plate models always run on the CPU, so that results do not depend on what ran before. A CPU works but is slow: on the GPU server's CPU, 12 frames took about 9 s, including loading the detector.
+- **Requirements.** These need the `detection` and `tracking` extras, and the `plates` extra for plate reading. Both use a GPU when one is available. The plate models run in a process of their own, because inside one process with PyTorch they change its detections. A CPU works but is slow: on the GPU server's CPU, 12 frames took about 9 s, including loading the detector.
 
 ### Running on a GPU server
 
@@ -209,7 +210,7 @@ Two further videos are used locally and **not committed**, so Notebooks 05b and 
 | File | Content | Role |
 | --- | --- | --- |
 | `data/raw/rlr_occasions.mp4` | Screen recording of a public YouTube compilation of red-light running: 18 clips of one junction, 1280×720, 30 FPS. Its reuse rights are unconfirmed. | Red-light rule and its evaluation (Notebook 05b) |
-| `data/traffic_video_modified.mp4` | Night traffic with a moving camera, 1920×1012, 26.33 FPS. **The signal is a graphic added to the footage**, so results on it are never real violations. | Logic test (Notebook 05b); plate reading (Notebook 06) |
+| `data/traffic_video_modified.mp4` | Night traffic with a moving camera, 1920×1012, 26.33 FPS. **The signal is a graphic added to the footage**, treated as the real signal in a simulation. | Logic test (Notebook 05b); plate reading and the whole chain on a simulated signal (Notebook 06) |
 
 ## Candidate Technologies
 
@@ -252,7 +253,7 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 07: Violation Event Generation** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the clips available now cannot show the whole chain working.
+**Phase 1 / Notebook 07: Violation Event Generation** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
 
 Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
 
@@ -261,6 +262,7 @@ Notebook 06 is complete on the GPU server:
 - [x] A plate is read from 12 frames and the reads are compared. Each vehicle ends as `read`, `uncertain`, `unreadable` or `no_plate_found`.
 - [x] Evaluation video, with settings committed first: no wrong `read`, and no text invented for the 35 tracks unreadable by eye. 6 of 14 readable tracks got a correct `read`. **All 6 are among tracks whose OCR output was seen before labelling, so this is not independent confirmation.**
 - [x] `read_plates_video` and `read_plates_from_clips` join the small functions into one call each.
+- [x] The whole chain on a simulated signal, with a graphic treated as the real signal: 9 crossings judged, 1 car flagged on red, and its plate read from its clip with 9 of 9 frames agreeing. By eye, 1 other car crossed on red and was missed, because its track broke while the flagged car hid it.
 - [ ] **No plate could be read in the 16 clips of candidate violations:** they are too small and blurred in the source. Each event states this explicitly.
 - [ ] **The plate labels were made by the AI assistant that wrote the code, and await a person's review.**
 
