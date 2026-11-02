@@ -52,11 +52,11 @@ tracking = [
     "timm>=1.0.15,<2",
     "tqdm>=4.67.1,<5",
 ]
-# For Notebook 06. These run on the CPU on purpose: see load_plate_models.
+# For Notebook 06. Use the "onnx" extras instead on a machine without a CUDA GPU.
 # The code of both packages is MIT licensed; their READMEs state no license for the model weights.
 plates = [
-    "fast-plate-ocr[onnx]>=1.1,<1.2",
-    "open-image-models[onnx]>=0.6,<0.7",
+    "fast-plate-ocr[onnx-gpu]>=1.1,<1.2",
+    "open-image-models[onnx-gpu]>=0.6,<0.7",
 ]
 dev = [
     "pytest>=8",

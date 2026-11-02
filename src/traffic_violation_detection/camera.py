@@ -22,9 +22,14 @@ IDENTITY = (1.0, 0.0, 0.0, 0.0)
 STATIC_CLASSES = {"traffic light"}  # Part of the scene, so they stay usable.
 
 
-def static_mask(shape: tuple[int, int], detections: list[dict], margin: int = MASK_MARGIN) -> np.ndarray:
-    """A mask of the image without its moving objects: 255 where keypoints may be used."""
+def static_mask(shape: tuple[int, int], detections: list[dict], margin: int = MASK_MARGIN, excluded_areas=()) -> np.ndarray:
+    """A mask of the image without its moving objects: 255 where keypoints may be used.
+
+    ``excluded_areas`` are ``x1, y1, x2, y2`` boxes of anything that does not move with the camera, such as a watermark.
+    """
     mask = np.full(shape, 255, np.uint8)
+    for x1, y1, x2, y2 in excluded_areas:
+        mask[y1:y2, x1:x2] = 0
     for d in detections:
         if d["class_name"] in STATIC_CLASSES:
             continue
@@ -49,7 +54,7 @@ def fit_similarity(points, descriptors, reference_points, reference_descriptors,
     return None if matrix is None else (float(matrix[0, 0]), float(matrix[1, 0]), float(matrix[0, 2]), float(matrix[1, 2]))
 
 
-def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[list[dict]], reference_frame: int) -> np.ndarray:
+def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[list[dict]], reference_frame: int, excluded_areas=()) -> np.ndarray:
     """Per-frame ``(a, b, tx, ty)`` from each frame to the reference frame, for the frames of ``detections_by_frame``.
 
     A frame that cannot be matched keeps the transform of the frame before it, and a warning reports how many did.
@@ -59,7 +64,7 @@ def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[lis
     orb = cv2.ORB_create(ORB_FEATURES)
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
     gray = cv2.cvtColor(read_frame_at(video_path, reference_frame)["image"], cv2.COLOR_BGR2GRAY)
-    reference_points, reference_descriptors = orb.detectAndCompute(gray, static_mask(gray.shape, detections_by_frame[reference_frame]))
+    reference_points, reference_descriptors = orb.detectAndCompute(gray, static_mask(gray.shape, detections_by_frame[reference_frame], excluded_areas=excluded_areas))
 
     params = np.zeros((len(detections_by_frame), 4))
     current = IDENTITY
@@ -67,7 +72,7 @@ def estimate_camera_motion(video_path: str | Path, detections_by_frame: list[lis
     for record in iter_frames(video_path, 0, len(detections_by_frame)):
         k = record["frame_index"]
         gray = cv2.cvtColor(record["image"], cv2.COLOR_BGR2GRAY)
-        points, descriptors = orb.detectAndCompute(gray, static_mask(gray.shape, detections_by_frame[k]))
+        points, descriptors = orb.detectAndCompute(gray, static_mask(gray.shape, detections_by_frame[k], excluded_areas=excluded_areas))
         fitted = fit_similarity(points, descriptors, reference_points, reference_descriptors, matcher)
         unmatched += fitted is None
         current = fitted if fitted is not None else current

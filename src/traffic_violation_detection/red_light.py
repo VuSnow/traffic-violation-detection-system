@@ -25,8 +25,10 @@ import cv2
 import numpy as np
 from scipy.ndimage import median_filter
 
+from traffic_violation_detection.camera import estimate_camera_motion
 from traffic_violation_detection.detection import OUTPUT_CRF, load_detector
 from traffic_violation_detection.evidence import write_event_clips
+from traffic_violation_detection.scene import frame_to_reference, reference_to_frame
 from traffic_violation_detection.tracking import TRACKING_SESSION, add_to_tracks, majority_class, track_frames
 from traffic_violation_detection.video import iter_frames, output_video_path, read_video_metadata, video_writer
 
@@ -47,6 +49,8 @@ RULE = {
 }
 
 SIGNAL_GROUPS = ("through", "left")
+TRAFFIC_DIRECTIONS = ("away_from_camera", "toward_camera")
+DEFAULT_LAMP_HALF = 6  # Half the side of the square read around a lamp, in px.
 
 CANDIDATE = "candidate"
 COMPLIANT = "signal_not_red"
@@ -75,6 +79,10 @@ def load_red_light_scene(path: str | Path, width: int, height: int) -> dict:
             raise ValueError(f"clip {name}: unknown signal method {clip['signals']['method']}")
         if not clip["signals"]["through"]:
             raise ValueError(f"clip {name}: no signal for the through lanes")
+        if clip.get("traffic_direction", TRAFFIC_DIRECTIONS[0]) not in TRAFFIC_DIRECTIONS:
+            raise ValueError(f"clip {name}: unknown traffic direction {clip['traffic_direction']}")
+    if "camera" in scene and (len(scene["clips"]) != 1 or next(iter(scene["clips"].values()))["start"] != 0):
+        raise ValueError("A moving camera needs a single clip that starts at the first frame")
     return scene
 
 
@@ -114,10 +122,10 @@ def read_lamp_state(frame: np.ndarray, lamps: dict, half: int = 6) -> str:
     return best if counts[best] >= 6 and counts[best] >= 2 * (sum(counts.values()) - counts[best]) else "unknown"
 
 
-def read_group_state(frame: np.ndarray, method: str, heads: list) -> str:
+def read_group_state(frame: np.ndarray, method: str, heads: list, lamp_half: int = DEFAULT_LAMP_HALF) -> str:
     """Combined state of the heads of one signal group: ``conflict`` if they disagree, ``unknown`` if none is readable."""
     if method == "lamps":
-        states = [read_lamp_state(frame, lamps) for lamps in heads]
+        states = [read_lamp_state(frame, lamps, lamp_half) for lamps in heads]
     else:
         states = [read_head_state(frame[y1:y2, x1:x2]) for x1, y1, x2, y2 in heads]
     known = {s for s in states if s != "unknown"}
@@ -164,8 +172,12 @@ def movement_after(displacement, lane_direction_deg: float, rule: dict = RULE) -
 def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_deg: float, width: int, height: int, rule: dict = RULE) -> dict | None:
     """Judge one track against the stop line. Returns a crossing record, or None if it never crosses.
 
-    ``track`` holds ``track_id``, ``frames``, ``boxes`` (N x 4, xyxy) and ``class_name``.
+    ``track`` holds ``track_id``, ``frames``, ``boxes`` (N x 4, xyxy) and ``class_name``. With a moving
+    camera, ``boxes`` are in the coordinates of the stop line, and ``frame_boxes`` keeps them in frame
+    pixels, because only those can touch the image border.
     ``signal_states`` maps ``"through"`` and ``"left"`` to per-frame states, indexed by frame number.
+    A clip's ``traffic_direction`` says which way vehicles cross the line. Coming toward the camera,
+    a box's bottom edge is already the vehicle's front, so such a clip sets ``entry_offset`` to 0.
     """
     frames = np.asarray(track["frames"])
     boxes = np.asarray(track["boxes"], dtype=np.float64)
@@ -176,8 +188,10 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     bottom = median_filter(np.c_[centers, boxes[:, 3]], size=(kernel, 1), mode="nearest")
     box_heights = median_filter(boxes[:, 3] - boxes[:, 1], size=kernel, mode="nearest")
     line = line_y(clip["stop_line"], bottom[:, 0])
-    rear_margin = bottom[:, 1] - line                                       # positive: the rear is still before the line
-    front_margin = rear_margin - rule["entry_offset"] * box_heights          # positive: the front is still before the line
+    side = -1.0 if clip.get("traffic_direction") == "toward_camera" else 1.0  # Which side of the line is "before" it.
+    entry_offset = clip.get("entry_offset", rule["entry_offset"])
+    rear_margin = side * (bottom[:, 1] - line)                               # positive: the rear is still before the line
+    front_margin = rear_margin - entry_offset * box_heights                  # positive: the front is still before the line
 
     front_cross = np.flatnonzero((front_margin[:-1] > 0) & (front_margin[1:] <= 0))
     rear_cross = np.flatnonzero((rear_margin[:-1] > 0) & (rear_margin[1:] <= 0))
@@ -203,7 +217,7 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     while signal_states[group].get(state_since - 1) == state:
         state_since -= 1
     movement = movement_after(bottom[-1] - bottom[at], lane_direction_deg, rule)
-    box = boxes[at]
+    box = np.asarray(track.get("frame_boxes", boxes), dtype=np.float64)[at]
     margin = rule["border_margin"]
     at_border = bool(box[0] <= margin or box[2] >= width - margin or box[3] >= height - margin)
     later = rear_margin[at:]
@@ -305,29 +319,44 @@ def build_event(record: dict, clip_name: str, video_id: str, fps: float, clip_st
 def read_frame_signals(image: np.ndarray, clip: dict) -> dict[str, str]:
     """The state of each signal group in one frame."""
     signals = clip["signals"]
-    return {group: read_group_state(image, signals["method"], signals[group]) if signals[group] else "unknown" for group in SIGNAL_GROUPS}
+    lamp_half = signals.get("lamp_half", DEFAULT_LAMP_HALF)
+    return {group: read_group_state(image, signals["method"], signals[group], lamp_half) if signals[group] else "unknown" for group in SIGNAL_GROUPS}
 
 
-def track_and_read_clip(video_path: str | Path, clip: dict, detector) -> tuple[dict[str, list], dict[str, dict[int, str]]]:
-    """One pass over a clip, with a new tracker. Returns its tracks, and each signal group's smoothed state per frame."""
+def track_and_read_clip(video_path: str | Path, clip: dict, detector) -> tuple[dict[str, list], dict[str, dict[int, str]], list[list[dict]]]:
+    """One pass over a clip, with a new tracker. Returns its tracks, each signal group's smoothed state per frame, and each frame's detections."""
     tracks: dict[str, list] = {}
     raw: dict[str, list[str]] = {group: [] for group in SIGNAL_GROUPS}
-    for record, _, tracked in track_frames(video_path, detector, clip["start"], clip["end"]):
+    detections_by_frame = []
+    for record, detections, tracked in track_frames(video_path, detector, clip["start"], clip["end"]):
         add_to_tracks(tracks, record["frame_index"], tracked)
+        detections_by_frame.append(detections)
         for group, state in read_frame_signals(record["image"], clip).items():
             raw[group].append(state)
     states = {group: {clip["start"] + i: s for i, s in enumerate(smooth_states(values))} for group, values in raw.items()}
-    return tracks, states
+    return tracks, states, detections_by_frame
 
 
-def as_track(track_id: str, rows: list) -> dict:
-    """The input of ``evaluate_track`` from a track's rows."""
-    return {"track_id": track_id, "class_name": majority_class(rows), "frames": [r[0] for r in rows], "boxes": [r[1:5] for r in rows]}
+def to_reference_box(row: list, camera_params: np.ndarray) -> list[float]:
+    """A box moved into reference coordinates. It keeps its size, and its bottom center decides where it lands."""
+    frame, x1, y1, x2, y2 = row[:5]
+    x, y = frame_to_reference(camera_params[int(frame)], [[(x1 + x2) / 2, y2]])[0]
+    width, height = x2 - x1, y2 - y1
+    return [float(x - width / 2), float(y - height), float(x + width / 2), float(y)]
 
 
-def evaluate_clip(tracks: dict[str, list], clip: dict, states: dict, lane_direction_deg: float, width: int, height: int, fps: float, rule: dict = RULE) -> list[dict]:
+def as_track(track_id: str, rows: list, camera_params: np.ndarray | None = None) -> dict:
+    """The input of ``evaluate_track`` from a track's rows, in reference coordinates if the camera moves."""
+    frame_boxes = [r[1:5] for r in rows]
+    track = {"track_id": track_id, "class_name": majority_class(rows), "frames": [r[0] for r in rows], "boxes": frame_boxes}
+    if camera_params is not None:
+        track.update(boxes=[to_reference_box(r, camera_params) for r in rows], frame_boxes=frame_boxes)
+    return track
+
+
+def evaluate_clip(tracks: dict[str, list], clip: dict, states: dict, lane_direction_deg: float, width: int, height: int, fps: float, rule: dict = RULE, camera_params: np.ndarray | None = None) -> list[dict]:
     """The crossing records of a clip's tracks, with duplicate candidates merged."""
-    records = [evaluate_track(as_track(t, rows), clip, states, lane_direction_deg, width, height, rule) for t, rows in tracks.items()]
+    records = [evaluate_track(as_track(t, rows, camera_params), clip, states, lane_direction_deg, width, height, rule) for t, rows in tracks.items()]
     return deduplicate([r for r in records if r], fps, rule)
 
 
@@ -337,10 +366,11 @@ def verdict_color(verdict: str) -> tuple[int, int, int]:
     return (170, 170, 170) if verdict.startswith("not_evaluable") else (80, 200, 80)
 
 
-def draw_clip_frame(image: np.ndarray, clip: dict, present: list[tuple[str, list]], records_by_track: dict[str, dict], frame_index: int) -> None:
+def draw_clip_frame(image: np.ndarray, clip: dict, present: list[tuple[str, list]], records_by_track: dict[str, dict], frame_index: int, frame_params=None) -> None:
     """Draw the stop line, and each vehicle: neutral until it enters, then colored by the rule's verdict."""
     thickness = max(1, round(image.shape[0] / 540))
-    cv2.polylines(image, [np.array(clip["stop_line"], np.int32)], False, (0, 255, 0), thickness, cv2.LINE_AA)
+    line = np.array(clip["stop_line"], dtype=np.float64) if frame_params is None else reference_to_frame(frame_params, clip["stop_line"])
+    cv2.polylines(image, [np.round(line).astype(np.int32)], False, (0, 255, 0), thickness, cv2.LINE_AA)
     for track_id, row in present:
         record = records_by_track.get(track_id)
         entered = record is not None and frame_index >= record["frame"]
@@ -361,7 +391,7 @@ def draw_banner(image: np.ndarray, text: str) -> None:
     cv2.putText(image, text, (8, height + 8), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
 
 
-def write_result_video(video_path: Path, output_path: Path, fps: float, clips: dict, tracks: dict, states: dict, records: dict) -> None:
+def write_result_video(video_path: Path, output_path: Path, fps: float, clips: dict, tracks: dict, states: dict, records: dict, camera_motion: dict | None = None) -> None:
     """Write the frames of each clip with the stop line, the signal state, each vehicle's verdict, and the candidates so far."""
     flagged = 0
     with video_writer(output_path, fps, OUTPUT_CRF) as write_frame:
@@ -372,9 +402,10 @@ def write_result_video(video_path: Path, output_path: Path, fps: float, clips: d
                 for row in rows:
                     present.setdefault(int(row[0]), []).append((track_id, row))
             entries = sorted(r["frame"] for r in records[name] if r["verdict"] == CANDIDATE)
+            motion = (camera_motion or {}).get(name)
             for record in iter_frames(video_path, clip["start"], clip["end"]):
                 image, k = record["image"], record["frame_index"]
-                draw_clip_frame(image, clip, present.get(k, []), by_track, k)
+                draw_clip_frame(image, clip, present.get(k, []), by_track, k, None if motion is None else motion[k])
                 so_far = flagged + sum(entry <= k for entry in entries)
                 draw_banner(image, f"through: {states[name]['through'].get(k, '?')}  left: {states[name]['left'].get(k, '?')}  candidates: {so_far} (pending review)")
                 write_frame(image)
@@ -385,7 +416,9 @@ def detect_red_light_video(video_path: str | Path, output_folder_path: str | Pat
     """Find red-light candidates in a video, from start to finish.
 
     ``scene_path`` is the scene configuration of this camera: its stop line and signal positions
-    cannot be read from the video. Only the frame ranges of its clips are analysed and saved. In
+    cannot be read from the video. Only the frame ranges of its clips are analysed and saved. A
+    ``camera`` entry says that the camera moves: the stop line is then in the coordinates of its
+    ``reference_frame``, and its ``excluded_areas`` hold what is drawn over the image. In
     ``output_folder_path`` this saves:
 
     - ``<video name>_output.mp4``: those frames, showing the stop line, the signal state and each verdict;
@@ -400,16 +433,19 @@ def detect_red_light_video(video_path: str | Path, output_folder_path: str | Pat
     scene = load_red_light_scene(scene_path, width, height)
     detector = model if model is not None else load_detector()
     clips = scene["clips"]
+    camera = scene.get("camera")
+    signal_source = scene.get("signal_source", "camera")
     video_id = video_path.stem
 
-    tracks, states, records, events = {}, {}, {}, []
+    tracks, states, records, events, camera_motion = {}, {}, {}, [], {}
     for name, clip in clips.items():
-        tracks[name], states[name] = track_and_read_clip(video_path, clip, detector)
-        records[name] = evaluate_clip(tracks[name], clip, states[name], scene["lane_direction_deg"], width, height, fps)
-        events += [build_event(r, name, video_id, fps, clip["start"]) for r in records[name] if r["verdict"] == CANDIDATE]
+        tracks[name], states[name], detections = track_and_read_clip(video_path, clip, detector)
+        camera_motion[name] = estimate_camera_motion(video_path, detections, camera["reference_frame"], camera.get("excluded_areas", ())) if camera else None
+        records[name] = evaluate_clip(tracks[name], clip, states[name], scene["lane_direction_deg"], width, height, fps, camera_params=camera_motion[name])
+        events += [build_event(r, name, video_id, fps, clip["start"], signal_source) for r in records[name] if r["verdict"] == CANDIDATE]
 
     output_video = output_video_path(video_path, folder)
-    write_result_video(video_path, output_video, fps, clips, tracks, states, records)
+    write_result_video(video_path, output_video, fps, clips, tracks, states, records, camera_motion)
     manifest = write_event_clips(
         video_path, events,
         lambda e: tracks[e["clip"]][e["track_id"]],
@@ -422,7 +458,7 @@ def detect_red_light_video(video_path: str | Path, output_folder_path: str | Pat
         "scene_id": scene["scene_id"],
         "rule": RULE,
         "tracking_session": f"{video_id}/{TRACKING_SESSION}",
-        "signal_source": "camera",
+        "signal_source": signal_source,
         "events": events,
         "crossings": records,
     }, indent=1))

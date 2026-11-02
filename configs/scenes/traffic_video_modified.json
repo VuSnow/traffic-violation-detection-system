@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "scene_id": "traffic_video_modified",
+  "video": {"file": "data/traffic_video_modified.mp4", "width": 1920, "height": 1012, "fps": 26.33},
+  "source": "Stock night traffic with a signal graphic added to the image. This is a simulation: the graphic is treated as the real signal of the road.",
+  "signal_source": "simulated_overlay",
+  "lane_direction_deg": 169.0,
+  "camera": {
+    "reference_frame": 357,
+    "excluded_areas": [[1742, 21, 1879, 309], [500, 410, 1420, 670]]
+  },
+  "assumptions": [
+    "The signal graphic governs every lane that crosses the stop line.",
+    "The stop line follows the painted line across the lanes, from the kerb on the left to the barrier on the right.",
+    "Coordinates of the stop line are pixels of the reference frame, because the camera moves.",
+    "Vehicles come toward the camera, so a box's bottom edge is taken as the vehicle's front."
+  ],
+  "clips": {
+    "main": {
+      "start": 0,
+      "end": 715,
+      "lighting": "night",
+      "role": "simulation",
+      "traffic_direction": "toward_camera",
+      "entry_offset": 0.0,
+      "stop_line": [[675, 841], [1045, 852], [1864, 888]],
+      "lane_dividers": [675, 1864],
+      "signals": {
+        "method": "lamps",
+        "lamp_half": 12,
+        "through": [{"red": [1810, 79], "yellow": [1810, 160], "green": [1810, 239]}],
+        "left": [{"red": [1810, 79], "yellow": [1810, 160], "green": [1810, 239]}]
+      }
+    }
+  }
+}

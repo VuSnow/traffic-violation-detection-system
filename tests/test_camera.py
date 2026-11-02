@@ -34,6 +34,25 @@ def test_mask_keeps_traffic_lights_usable():
     assert (mask == 255).all()
 
 
+def test_mask_blocks_excluded_areas():
+    mask = static_mask((200, 300), [], excluded_areas=[(50, 60, 100, 120)])
+    assert mask[80, 70] == 0 and mask[80, 120] == 255 and mask[130, 70] == 255
+
+
+def test_graphic_fixed_on_the_image_does_not_hold_back_the_estimate(tmp_path):
+    # A sharp graphic that stays still on the image while the camera moves, like a watermark or a signal overlay.
+    background = texture()
+    graphic = texture(seed=2)[:150, :200]
+    shifts = [(0, 0), (6, 3), (12, 6)]
+    frames = []
+    for shift in shifts:
+        frame = view(background, *shift)
+        frame[20:170, 20:220] = graphic
+        frames.append(frame)
+    params = estimate_camera_motion(write_video(tmp_path / "v.mp4", frames), [[] for _ in frames], 0, excluded_areas=[(10, 10, 230, 180)])
+    assert params[2][2] == pytest.approx(12, abs=1.0) and params[2][3] == pytest.approx(6, abs=1.0)
+
+
 def test_motion_is_recovered_on_a_shifting_camera(tmp_path):
     background = texture()
     shifts = [(0, 0), (4, 2), (8, 4), (12, 6), (16, 8)]
