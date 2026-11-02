@@ -12,6 +12,7 @@ from traffic_violation_detection.tracking import (
     collect_tracks,
     create_tracker,
     draw_tracks,
+    join_track_fragments,
     majority_class,
     track_color,
     track_frames,
@@ -129,3 +130,58 @@ def test_real_tracker_keeps_one_id_for_a_moving_vehicle():
         tracked = update_tracker(tracker, [detection(CAR, (100 + 4 * k, 100, 200 + 4 * k, 200))], image)
         ids |= {t["track_id"] for t in tracked}
     assert len(ids) == 1
+
+
+def piece(first, last, x=100.0, step=0.0, height=100.0):
+    # A track of a box whose bottom center moves step px per frame.
+    return [[k, x + step * (k - first) - 20, 200, x + step * (k - first) + 20, 200 + height, 2, 0.9] for k in range(first, last + 1)]
+
+
+def join(tracks, box_of=None):
+    return join_track_fragments(tracks, max_gap_frames=6, max_jump_heights=0.1, max_size_ratio=1.25, box_of=box_of)
+
+
+def test_join_merges_a_track_that_continues_another():
+    joined = join({"0": piece(0, 10), "1": piece(12, 20)})
+    assert list(joined) == ["0+1"] and [row[0] for row in joined["0+1"]] == list(range(0, 11)) + list(range(12, 21))
+
+
+def test_join_keeps_one_row_per_frame_where_two_tracks_overlap():
+    joined = join({"0": piece(0, 10), "1": piece(9, 20)})
+    assert [row[0] for row in joined["0+1"]] == list(range(0, 21))
+
+
+def test_join_leaves_tracks_too_far_apart_in_space():
+    tracks = {"0": piece(0, 10), "1": piece(12, 20, x=120.0)}
+    assert join(tracks) == tracks
+
+
+def test_join_leaves_tracks_too_far_apart_in_time():
+    tracks = {"0": piece(0, 10), "1": piece(17, 20)}
+    assert join(tracks) == tracks
+
+
+def test_join_leaves_boxes_of_different_sizes():
+    tracks = {"0": piece(0, 10), "1": piece(12, 20, height=140.0)}
+    assert join(tracks) == tracks
+
+
+def test_join_leaves_two_vehicles_side_by_side():
+    tracks = {"0": piece(0, 20), "1": piece(5, 25)}
+    assert join(tracks) == tracks
+
+
+def test_join_chains_three_parts():
+    assert list(join({"0": piece(0, 5), "1": piece(6, 10), "2": piece(11, 15)})) == ["0+1+2"]
+
+
+def test_join_picks_the_nearest_of_two_continuations():
+    joined = join({"0": piece(0, 10), "1": piece(12, 20, x=108.0), "2": piece(12, 20, x=101.0)})
+    assert sorted(joined) == ["0+2", "1"]
+
+
+def test_join_measures_with_the_given_boxes():
+    # On the image they are apart, but the camera moved, so on the road they are the same place.
+    tracks = {"0": piece(0, 10), "1": piece(12, 20, x=160.0)}
+    on_the_road = lambda row: [row[1] - (60 if row[0] >= 12 else 0), row[2], row[3] - (60 if row[0] >= 12 else 0), row[4]]
+    assert list(join(tracks, on_the_road)) == ["0+1"]

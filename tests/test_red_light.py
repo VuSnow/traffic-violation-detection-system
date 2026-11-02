@@ -15,6 +15,7 @@ from traffic_violation_detection.red_light import (
     ENDED,
     OUT_OF_RANGE,
     RIGHT_TURN,
+    RULE_V1,
     STOPPED,
     UNKNOWN_SIGNAL,
     build_event,
@@ -143,6 +144,64 @@ def test_fragment_starting_past_the_entry_is_still_judged():
     # The front is already past the line when the track starts, and the rear crosses it later.
     record = judge(track((600, 420), ALONG_LANE))
     assert record["verdict"] == CANDIDATE and not record["entry_seen"]
+
+
+def hidden_track(start, velocity, first_frame=100, n=80):
+    return track(start, velocity, n=n, first_frame=first_frame)
+
+
+def signal_from(change_frame, before, after, n=400):
+    states_by_frame = {k: before if k < change_frame else after for k in range(n)}
+    return {"through": states_by_frame, "left": states_by_frame}
+
+
+# Bottom edge at y=395 with the box 100 tall: the rear is already past the line, the front by 35 px, at 2.44 px per frame.
+HIDDEN = ((800, 395), (5.48, -2.44))
+
+
+def test_vehicle_first_seen_past_the_line_on_red_is_a_candidate_with_an_estimated_entry():
+    record = judge(hidden_track(*HIDDEN))
+    assert record["verdict"] == CANDIDATE and record["entry_estimated"] and not record["entry_seen"]
+    assert record["frame"] == pytest.approx(86, abs=1) and record["x"] == pytest.approx(723, abs=5)
+
+
+def test_event_says_that_its_entry_was_estimated():
+    event = build_event(judge(hidden_track(*HIDDEN)), "B", "rlr_occasions", FPS, clip_start=0)
+    assert event["why"].startswith("Estimated to have entered, while hidden from view,") and event["evidence"]["entry_estimated"]
+
+
+def test_event_with_a_seen_entry_does_not_say_estimated():
+    assert build_event(judge(track((600, 480), ALONG_LANE)), "B", "rlr_occasions", FPS, clip_start=0)["why"].startswith("Entered in lane")
+
+
+def test_estimated_entry_is_not_judged_if_the_signal_changed_around_it():
+    # Red only began at frame 80, within the margin before the estimated entry.
+    record = judge(hidden_track(*HIDDEN), signal_from(80, "yellow", "red"))
+    assert record["verdict"] == UNKNOWN_SIGNAL and record["entry_estimated"]
+
+
+def test_estimated_entry_needs_the_signal_to_hold_until_the_vehicle_is_seen():
+    assert judge(hidden_track(*HIDDEN), signal_from(98, "red", "green"))["verdict"] == UNKNOWN_SIGNAL
+
+
+def test_waiting_vehicle_past_the_line_gives_no_estimate():
+    assert judge(hidden_track((800, 395), (0.2, -0.1))) is None
+
+
+def test_vehicle_crossing_the_lane_gives_no_estimate():
+    assert judge(hidden_track((800, 395), (-3.0, -3.0))) is None
+
+
+def test_entry_too_far_back_gives_no_estimate():
+    assert judge(hidden_track((800, 340), (5.48, -2.44))) is None
+
+
+def test_entry_before_the_clip_gives_no_estimate():
+    assert judge(hidden_track(*HIDDEN, first_frame=20)) is None
+
+
+def test_version_1_does_not_estimate_entries():
+    assert evaluate_track(hidden_track(*HIDDEN), CLIP, states("red"), LANE_ANGLE, W, H, RULE_V1) is None
 
 
 def test_left_lane_uses_the_left_signal():

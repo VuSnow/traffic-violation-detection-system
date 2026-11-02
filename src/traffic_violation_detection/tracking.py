@@ -80,6 +80,40 @@ def collect_tracks(video_path: str | Path, detector, start: int = 0, end: int | 
     return tracks, detections_by_frame
 
 
+def join_track_fragments(tracks: dict[str, list], max_gap_frames: int, max_jump_heights: float, max_size_ratio: float, box_of=None) -> dict[str, list]:
+    """Join tracks that are plainly one vehicle under two ids: one ends where the other begins, at the same size.
+
+    The limits are strict on purpose. Joining two vehicles could give one of them the other's plate,
+    while leaving a vehicle in two parts only costs a missed case. ``box_of(row)`` gives a row's box,
+    in reference coordinates if the camera moves. A joined track's id is ``"<first>+<second>"``.
+    """
+    box_of = box_of or (lambda row: row[1:5])
+
+    def bottom_and_height(row: list) -> tuple[float, float, float]:
+        x1, y1, x2, y2 = box_of(row)
+        return (x1 + x2) / 2, y2, y2 - y1
+
+    def continuation(first: list, second: list) -> float | None:
+        # How far the second track starts from the end of the first, in box heights, or None if it does not continue it.
+        if not (second[0][0] > first[0][0] and second[-1][0] > first[-1][0] and abs(second[0][0] - first[-1][0]) <= max_gap_frames):
+            return None
+        x1, y1, height1 = bottom_and_height(first[-1])
+        x2, y2, height2 = bottom_and_height(second[0])
+        jump = float(np.hypot(x2 - x1, y2 - y1)) / max(height1, 1)
+        return jump if jump <= max_jump_heights and max(height1 / height2, height2 / height1) <= max_size_ratio else None
+
+    joined = {track_id: list(rows) for track_id, rows in tracks.items()}
+    while True:
+        pairs = [(continuation(joined[a], joined[b]), a, b) for a in joined for b in joined if a != b]
+        pairs = [p for p in pairs if p[0] is not None]
+        if not pairs:
+            return joined
+        _, first, second = min(pairs)
+        later = joined.pop(second)
+        earlier = joined.pop(first)
+        joined[f"{first}+{second}"] = [row for row in earlier if row[0] < later[0][0]] + later
+
+
 def majority_class(rows: list) -> str:
     """The class most often given to a track, since a single frame's class can be wrong."""
     class_id = Counter(int(row[5]) for row in rows).most_common(1)[0][0]

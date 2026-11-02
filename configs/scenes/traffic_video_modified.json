@@ -23,6 +23,7 @@
       "role": "simulation",
       "traffic_direction": "toward_camera",
       "entry_offset": 0.0,
+      "pass_margin": 0.2,
       "stop_line": [[675, 841], [1045, 852], [1864, 888]],
       "lane_dividers": [675, 1864],
       "signals": {

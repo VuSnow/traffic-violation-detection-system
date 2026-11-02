@@ -3,6 +3,11 @@
 The rule was shaped on three clips by inspecting its mistakes, then frozen before being
 evaluated on the other clips. Its output is a candidate for human review, never a verdict.
 
+Version 1 of the rule is the one evaluated in Notebook 05b. Version 2 adds two ways of handling a
+vehicle whose track breaks: it joins two tracks that are plainly one vehicle, and it estimates when
+a hidden vehicle crossed from how its track moves afterwards. Version 2 was shaped after seeing those
+clips, so its scores there are not a fair test.
+
 A crossing is a candidate only if all of these hold:
 
 - the signal of the vehicle's lane is readable and red when the vehicle enters;
@@ -29,12 +34,12 @@ from traffic_violation_detection.camera import estimate_camera_motion
 from traffic_violation_detection.detection import OUTPUT_CRF, load_detector
 from traffic_violation_detection.evidence import write_event_clips
 from traffic_violation_detection.scene import frame_to_reference, reference_to_frame
-from traffic_violation_detection.tracking import TRACKING_SESSION, add_to_tracks, majority_class, track_frames
+from traffic_violation_detection.tracking import TRACKING_SESSION, add_to_tracks, join_track_fragments, majority_class, track_frames
 from traffic_violation_detection.video import iter_frames, output_video_path, read_video_metadata, video_writer
 
 RULE = {
     "name": "red_light",
-    "version": 1,
+    "version": 2,
     "entry_offset": 0.30,      # front wheels: this fraction of the box height above the box bottom
     "pass_margin": 0.5,        # the rear must pass the line by this many box heights
     "min_track_frames": 8,
@@ -46,7 +51,17 @@ RULE = {
     "border_margin": 3,
     "duplicate_seconds": 1.0,
     "duplicate_px": 120,
+    "join_fragments": True,
+    "join_max_gap_frames": 6,
+    "join_max_jump_heights": 0.1,
+    "join_max_size_ratio": 1.25,
+    "estimate_hidden_entry": True,
+    "hidden_fit_frames": 10,     # The track's first frames, followed back to the line.
+    "hidden_max_frames": 30,     # An entry further back than this is too uncertain to estimate.
+    "hidden_margin_frames": 13,  # The signal must hold this long before the estimated entry: about 0.5 s.
+    "hidden_min_speed": 0.01,    # Box heights per frame; slower is a vehicle waiting, not one leaving the line.
 }
+RULE_V1 = {**RULE, "version": 1, "join_fragments": False, "estimate_hidden_entry": False}
 
 SIGNAL_GROUPS = ("through", "left")
 TRAFFIC_DIRECTIONS = ("away_from_camera", "toward_camera")
@@ -169,6 +184,27 @@ def movement_after(displacement, lane_direction_deg: float, rule: dict = RULE) -
     return "left" if turn < -rule["turn_angle_deg"] else "straight"
 
 
+def hidden_entry(frames: np.ndarray, bottom: np.ndarray, front_margin: np.ndarray, box_heights: np.ndarray, lane_direction_deg: float, rule: dict = RULE) -> tuple[int, float] | None:
+    """Estimate the frame and column where a vehicle crossed the line, for a track that starts past it.
+
+    The track's first frames are followed back to the line. None means no estimate: the vehicle is
+    waiting rather than leaving the line, it is not moving along the lane, or the line is too far back.
+    """
+    count = min(rule["hidden_fit_frames"], len(frames))
+    if count < 5:
+        return None
+    speed = float(np.polyfit(frames[:count], front_margin[:count], 1)[0])  # Negative: moving further past the line.
+    if speed >= -rule["hidden_min_speed"] * box_heights[0]:
+        return None
+    frames_back = float(front_margin[0]) / speed
+    if frames_back > rule["hidden_max_frames"]:
+        return None
+    if movement_after(bottom[count - 1] - bottom[0], lane_direction_deg, {**rule, "min_heading_px": 0}) != "straight":
+        return None
+    sideways = float(np.polyfit(frames[:count], bottom[:count, 0], 1)[0])
+    return int(round(frames[0] - frames_back)), float(bottom[0, 0] - sideways * frames_back)
+
+
 def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_deg: float, width: int, height: int, rule: dict = RULE) -> dict | None:
     """Judge one track against the stop line. Returns a crossing record, or None if it never crosses.
 
@@ -177,7 +213,9 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     pixels, because only those can touch the image border.
     ``signal_states`` maps ``"through"`` and ``"left"`` to per-frame states, indexed by frame number.
     A clip's ``traffic_direction`` says which way vehicles cross the line. Coming toward the camera,
-    a box's bottom edge is already the vehicle's front, so such a clip sets ``entry_offset`` to 0.
+    a box's bottom edge is already the vehicle's front, so such a clip sets ``entry_offset`` to 0, and
+    a smaller ``pass_margin``, because the image ends soon after the line.
+    An estimated entry is judged only if one signal state lasted from before it until the vehicle was seen.
     """
     frames = np.asarray(track["frames"])
     boxes = np.asarray(track["boxes"], dtype=np.float64)
@@ -195,17 +233,22 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
 
     front_cross = np.flatnonzero((front_margin[:-1] > 0) & (front_margin[1:] <= 0))
     rear_cross = np.flatnonzero((rear_margin[:-1] > 0) & (rear_margin[1:] <= 0))
+    estimated = None
     if len(front_cross):
         index, entry_seen = int(front_cross[0]), True
     elif front_margin[0] <= 0 and len(rear_cross):
         # The track starts with the front already past the line: a fragment of an earlier track of this vehicle.
         index, entry_seen = int(rear_cross[0]), False
+    elif rule["estimate_hidden_entry"] and front_margin[0] <= 0:
+        estimated = hidden_entry(frames, bottom, front_margin, box_heights, lane_direction_deg, rule)
+        if estimated is None or estimated[0] - rule["hidden_margin_frames"] < clip["start"]:
+            return None
+        index, entry_seen = -1, False
     else:
         return None
 
     at = index + 1
-    frame = int(frames[at])
-    x = float(bottom[at, 0])
+    frame, x = estimated if estimated else (int(frames[at]), float(bottom[at, 0]))
     stop_xs = [p[0] for p in clip["stop_line"]]
     if not (stop_xs[0] - 30 <= x <= stop_xs[-1] + 30):
         return None
@@ -213,6 +256,10 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     lane = lane_of(clip, x)
     group = "left" if lane == "left_turn" else "through"
     state = signal_states[group].get(frame, "unknown")
+    if estimated:
+        window = range(frame - rule["hidden_margin_frames"], int(frames[0]) + 1)
+        seen = {signal_states[group].get(k, "unknown") for k in window}
+        state = seen.pop() if len(seen) == 1 else "conflict"
     state_since = frame
     while signal_states[group].get(state_since - 1) == state:
         state_since -= 1
@@ -221,7 +268,7 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     margin = rule["border_margin"]
     at_border = bool(box[0] <= margin or box[2] >= width - margin or box[3] >= height - margin)
     later = rear_margin[at:]
-    passed = bool(later.min() <= -rule["pass_margin"] * box_heights[at])
+    passed = bool(later.min() <= -clip.get("pass_margin", rule["pass_margin"]) * box_heights[at])
     decide = rule["min_frames_to_decide"]
     recent_motion = float(np.hypot(*(bottom[-1] - bottom[-min(decide, len(later))])))
     still = recent_motion <= rule["still_box_heights"] * box_heights[at]
@@ -245,7 +292,7 @@ def evaluate_track(track: dict, clip: dict, signal_states: dict, lane_direction_
     return {
         "track_id": str(track["track_id"]), "class_name": track.get("class_name", "vehicle"), "frame": frame, "x": round(x, 1),
         "lane": lane, "signal_group": group, "signal_state": state, "state_for_frames": frame - state_since, "movement": movement,
-        "passed_line": passed, "entry_seen": entry_seen, "verdict": verdict, "box_xyxy": [round(float(v), 1) for v in box],
+        "passed_line": passed, "entry_seen": entry_seen, "entry_estimated": estimated is not None, "verdict": verdict, "box_xyxy": [round(float(v), 1) for v in box],
     }
 
 
@@ -308,9 +355,9 @@ def build_event(record: dict, clip_name: str, video_id: str, fps: float, clip_st
         "time_in_clip_s": round((frame - clip_start) / fps, 3),
         "rule": {"name": rule["name"], "version": rule["version"]},
         "signal_source": signal_source,
-        "why": (f"Entered in lane '{record['lane']}' while the {record['signal_group']} signal was red "
-                f"({record['state_for_frames'] / fps:.1f} s after it was first seen in that state), and continued past the stop line."),
-        "evidence": {k: record[k] for k in ("x", "lane", "signal_group", "signal_state", "movement", "entry_seen", "box_xyxy")},
+        "why": (f"{'Estimated to have entered, while hidden from view,' if record['entry_estimated'] else 'Entered'} in lane '{record['lane']}' while the "
+                f"{record['signal_group']} signal was red ({record['state_for_frames'] / fps:.1f} s after it was first seen in that state), and continued past the stop line."),
+        "evidence": {k: record[k] for k in ("x", "lane", "signal_group", "signal_state", "movement", "entry_seen", "entry_estimated", "box_xyxy")},
         "license_plate": None,
         "review_status": "pending",
     }
@@ -352,6 +399,14 @@ def as_track(track_id: str, rows: list, camera_params: np.ndarray | None = None)
     if camera_params is not None:
         track.update(boxes=[to_reference_box(r, camera_params) for r in rows], frame_boxes=frame_boxes)
     return track
+
+
+def join_clip_tracks(tracks: dict[str, list], camera_params: np.ndarray | None, rule: dict = RULE) -> dict[str, list]:
+    """A clip's tracks with the rule's joins applied, measured on the road if the camera moves."""
+    if not rule["join_fragments"]:
+        return tracks
+    box_of = None if camera_params is None else (lambda row: to_reference_box(row, camera_params))
+    return join_track_fragments(tracks, rule["join_max_gap_frames"], rule["join_max_jump_heights"], rule["join_max_size_ratio"], box_of)
 
 
 def evaluate_clip(tracks: dict[str, list], clip: dict, states: dict, lane_direction_deg: float, width: int, height: int, fps: float, rule: dict = RULE, camera_params: np.ndarray | None = None) -> list[dict]:
@@ -412,7 +467,7 @@ def write_result_video(video_path: Path, output_path: Path, fps: float, clips: d
             flagged += len(entries)
 
 
-def detect_red_light_video(video_path: str | Path, output_folder_path: str | Path, scene_path: str | Path, model=None) -> dict:
+def detect_red_light_video(video_path: str | Path, output_folder_path: str | Path, scene_path: str | Path, model=None, rule: dict = RULE) -> dict:
     """Find red-light candidates in a video, from start to finish.
 
     ``scene_path`` is the scene configuration of this camera: its stop line and signal positions
@@ -439,10 +494,11 @@ def detect_red_light_video(video_path: str | Path, output_folder_path: str | Pat
 
     tracks, states, records, events, camera_motion = {}, {}, {}, [], {}
     for name, clip in clips.items():
-        tracks[name], states[name], detections = track_and_read_clip(video_path, clip, detector)
+        clip_tracks, states[name], detections = track_and_read_clip(video_path, clip, detector)
         camera_motion[name] = estimate_camera_motion(video_path, detections, camera["reference_frame"], camera.get("excluded_areas", ())) if camera else None
-        records[name] = evaluate_clip(tracks[name], clip, states[name], scene["lane_direction_deg"], width, height, fps, camera_params=camera_motion[name])
-        events += [build_event(r, name, video_id, fps, clip["start"], signal_source) for r in records[name] if r["verdict"] == CANDIDATE]
+        tracks[name] = join_clip_tracks(clip_tracks, camera_motion[name], rule)
+        records[name] = evaluate_clip(tracks[name], clip, states[name], scene["lane_direction_deg"], width, height, fps, rule, camera_motion[name])
+        events += [build_event(r, name, video_id, fps, clip["start"], signal_source, rule) for r in records[name] if r["verdict"] == CANDIDATE]
 
     output_video = output_video_path(video_path, folder)
     write_result_video(video_path, output_video, fps, clips, tracks, states, records, camera_motion)
@@ -456,7 +512,7 @@ def detect_red_light_video(video_path: str | Path, output_folder_path: str | Pat
     events_path.write_text(json.dumps({
         "video_id": video_id,
         "scene_id": scene["scene_id"],
-        "rule": RULE,
+        "rule": rule,
         "tracking_session": f"{video_id}/{TRACKING_SESSION}",
         "signal_source": signal_source,
         "events": events,

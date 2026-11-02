@@ -13,6 +13,8 @@ from traffic_violation_detection.red_light import (
     AT_BORDER,
     CANDIDATE,
     COMPLIANT,
+    ENDED,
+    RULE_V1,
     UNKNOWN_SIGNAL,
     as_track,
     detect_red_light_video,
@@ -300,3 +302,41 @@ def test_committed_simulation_scene_loads():
     clip = scene["clips"]["main"]
     assert scene["signal_source"] == "simulated_overlay" and clip["traffic_direction"] == "toward_camera" and clip["entry_offset"] == 0.0
     assert 0 <= scene["camera"]["reference_frame"] < clip["end"]
+
+
+class SwitchingTracker(PassThroughTracker):
+    """Gives a vehicle a new id partway through, as a tracker does after an id switch."""
+
+    def __init__(self, switch_call):
+        self.switch_call = switch_call
+        self.calls = 0
+
+    def update(self, detections, image):
+        output = super().update(detections, image)
+        self.calls += 1
+        if self.calls > self.switch_call and len(output):
+            output[:, 4] += 10
+        return output
+
+
+def test_id_switch_is_joined_so_the_vehicle_is_judged_whole(tmp_path, monkeypatch):
+    # The id changes just past the line, before the car has gone far enough to be a candidate.
+    monkeypatch.setattr(tracking, "create_tracker", lambda: SwitchingTracker(34))
+    result = run(tmp_path, "red")
+    assert [r["track_id"] for r in result["crossings"]["main"]] == ["1+11"]
+    assert result["crossings"]["main"][0]["verdict"] == CANDIDATE and result["crossings"]["main"][0]["entry_seen"]
+
+
+def test_clip_of_a_joined_track_has_the_boxes_of_both_parts(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracking, "create_tracker", lambda: SwitchingTracker(34))
+    result = run(tmp_path, "red")
+    entry = json.loads(result["clips_manifest"].read_text())["clips"][0]
+    assert entry["event_id"].endswith("-t1+11") and len(entry["vehicle_boxes"]) > 34
+
+
+def test_rule_version_1_leaves_the_track_broken(tmp_path, monkeypatch):
+    monkeypatch.setattr(tracking, "create_tracker", lambda: SwitchingTracker(34))
+    video = write_video(tmp_path / "small.mp4", [head_frame("red")] * 60)
+    result = detect_red_light_video(video, tmp_path / "out", write_scene(tmp_path, {"main": clip_config()}), model=ScriptedDetector(car_going_up), rule=RULE_V1)
+    assert result["events"] == [] and [r["verdict"] for r in result["crossings"]["main"]] == [ENDED]
+    assert json.loads(result["events_file"].read_text())["rule"]["version"] == 1
