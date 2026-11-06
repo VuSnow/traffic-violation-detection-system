@@ -141,7 +141,7 @@ The port is configurable. Port 8000 is already taken by another service on ai_se
 
 ## 12. How it is built (decided by the user, 2026-11-07)
 
-- **The user writes the code,** to learn how such a system is built, from the algorithms to deployment. Each part has a step-by-step plan in `docs/superpowers/plans/`: one unit per step, with its full code, the command to run and the output to expect. Every plan is run on ai_server_2 before it is handed over.
+- **Each part has a step-by-step plan** in `docs/superpowers/plans/`, so that the user can build it, or build it again, to learn how such a system is made, from the algorithms to deployment: one unit per step, with its full code, the command to run and the output to expect. Every plan is run on ai_server_2 before it is handed over. At the user's request, the assistant then carried out Parts 1 and 2 from their plans.
 - **The algorithms are rewritten** in a new package, `src/tvd/`. The notebooks' package, `traffic_violation_detection`, stays as it is, and it is the reference: wherever the new code is compared with it, the results must match exactly.
 - **SOLID, with replaceable components.** Each kind of component (detector, tracker, rule, plate reader, storage) has an abstract base class and a registry. A settings file names the implementation, a factory builds it, and the pipeline only knows the base classes. Changing ByteTrack for OC-SORT is a change of one word in a YAML file.
 - **Five parts,** each ending with working, tested software:
@@ -149,8 +149,8 @@ The port is configurable. Port 8000 is already taken by another service on ai_se
 | Part | Builds |
 |---|---|
 | 1. Foundations and perception | Data types, registry, video reader, detector, trackers, settings, a `track` command |
-| 2. Scene and rules | Camera files, signal reading, the wrong-way and red-light rules |
+| 2. Scene and rules | Camera files, rule settings, camera motion, signal reading, the wrong-way and red-light rules, and one pass that applies a camera's rules (`check`) |
 | 3. Plates and evidence | Plate detection and OCR in a worker process, voting, clips, evidence images, records |
-| 4. The service | One pass for both rules, job queue, storage, REST API |
+| 4. The service | Job queue, storage, REST API, around the one pass of Part 2 |
 | 5. Deployment and MLOps | Docker, running on ai_server_2, logging, health checks, model versions |
 
