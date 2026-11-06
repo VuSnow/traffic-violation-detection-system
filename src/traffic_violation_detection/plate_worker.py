@@ -35,6 +35,10 @@ def create_models(settings: dict) -> tuple:
     options.intra_op_num_threads = settings["cpu_threads"]
     options.inter_op_num_threads = 1
     providers = [p for p in ("CUDAExecutionProvider", "CPUExecutionProvider") if p in ort.get_available_providers()]
+    if "CUDAExecutionProvider" in providers and hasattr(ort, "preload_dlls"):
+        # ONNX Runtime needs the CUDA 13 libraries, which pip installs with PyTorch but not on the loader's path.
+        # Without them, on a machine whose system CUDA is another version, it runs on the CPU with only a warning.
+        ort.preload_dlls()
     arguments = {"providers": providers, "sess_options": options}
     return create_detector(settings["detector_model"], **arguments), LicensePlateRecognizer(settings["ocr_model"], **arguments)
 
