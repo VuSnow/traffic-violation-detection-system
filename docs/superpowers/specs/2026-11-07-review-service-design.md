@@ -1,6 +1,6 @@
 # Violation Review Service: Design
 
-Date: 2026-11-07. Status: draft, awaiting the user's approval.
+Date: 2026-11-07. Status: approved by the user, with the build decisions of Section 12.
 
 ## 1. Intent
 
@@ -138,3 +138,19 @@ The port is configurable. Port 8000 is already taken by another service on ai_se
 - The exact YAML layout, within Section 4.
 - How progress is measured, for example frames processed.
 - How old job folders are cleaned up, within the configured retention.
+
+## 12. How it is built (decided by the user, 2026-11-07)
+
+- **The user writes the code,** to learn how such a system is built, from the algorithms to deployment. Each part has a step-by-step plan in `docs/superpowers/plans/`: one unit per step, with its full code, the command to run and the output to expect. Every plan is run on ai_server_2 before it is handed over.
+- **The algorithms are rewritten** in a new package, `src/tvd/`. The notebooks' package, `traffic_violation_detection`, stays as it is, and it is the reference: wherever the new code is compared with it, the results must match exactly.
+- **SOLID, with replaceable components.** Each kind of component (detector, tracker, rule, plate reader, storage) has an abstract base class and a registry. A settings file names the implementation, a factory builds it, and the pipeline only knows the base classes. Changing ByteTrack for OC-SORT is a change of one word in a YAML file.
+- **Five parts,** each ending with working, tested software:
+
+| Part | Builds |
+|---|---|
+| 1. Foundations and perception | Data types, registry, video reader, detector, trackers, settings, a `track` command |
+| 2. Scene and rules | Camera files, signal reading, the wrong-way and red-light rules |
+| 3. Plates and evidence | Plate detection and OCR in a worker process, voting, clips, evidence images, records |
+| 4. The service | One pass for both rules, job queue, storage, REST API |
+| 5. Deployment and MLOps | Docker, running on ai_server_2, logging, health checks, model versions |
+
