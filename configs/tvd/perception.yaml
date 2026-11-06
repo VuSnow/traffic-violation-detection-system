@@ -1,0 +1,14 @@
+# How the service detects and tracks. Change "type" to swap an implementation; no code changes.
+detector:
+  type: yolo
+  options:
+    weights: yolo26m.pt
+    image_size: 1280
+    confidence: 0.10        # low on purpose: the tracker uses low-score boxes
+    iou: 0.7
+    classes: [person, bicycle, car, motorcycle, bus, truck, traffic light]
+tracker:
+  type: ocsort              # one of: bytetrack, ocsort, botsort
+  options:
+    use_byte: true          # OC-SORT with BYTE's low-score association, as in Notebook 03
+track_classes: [bicycle, car, motorcycle, bus, truck]
