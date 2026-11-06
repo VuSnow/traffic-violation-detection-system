@@ -58,6 +58,10 @@ plates = [
     "fast-plate-ocr[onnx-gpu]>=1.1,<1.2",
     "open-image-models[onnx-gpu]>=0.6,<0.7",
 ]
+# For Notebook 09: tracking scores (MOTA, IDF1). motmetrics is MIT licensed.
+evaluation = [
+    "motmetrics>=1.4,<2",
+]
 dev = [
     "pytest>=8",
 ]
