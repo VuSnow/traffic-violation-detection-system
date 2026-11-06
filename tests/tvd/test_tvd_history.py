@@ -1,5 +1,5 @@
 from tvd.domain import Box, TrackedObject
-from tvd.tracking.history import TrackHistory
+from tvd.tracking.history import TrackHistory, majority_class
 
 
 def tracked(track_id: int, x: float, class_name: str = "car") -> TrackedObject:
@@ -39,3 +39,17 @@ def test_box_at_a_frame():
     history = TrackHistory()
     history.add(3, [tracked(1, 7)])
     assert history.tracks[1].box_at(3) == Box(7, 0, 17, 10) and history.tracks[1].box_at(4) is None
+
+
+def test_each_point_keeps_its_class():
+    history = TrackHistory()
+    history.add(0, [tracked(1, 0, "car")])
+    history.add(1, [tracked(1, 0, "truck")])
+    assert [p.class_name for p in history.tracks[1].points] == ["car", "truck"]
+
+
+def test_majority_class_of_any_points():
+    history = TrackHistory()
+    for index, name in enumerate(["bus", "car", "car"]):
+        history.add(index, [tracked(1, 0, name)])
+    assert majority_class(history.tracks[1].points[:1]) == "bus" and majority_class(history.tracks[1].points) == "car"
