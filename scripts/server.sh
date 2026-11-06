@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Work on the GPU server from this machine.
-#   scripts/server.sh sync             copy src/, tests/, configs/, scripts/ and pyproject.toml to the server
-#   scripts/server.sh test [args]      run pytest there, e.g. scripts/server.sh test tests/tvd -q
+#   scripts/server.sh sync             make the server's src/, tests/, configs/, scripts/ and pyproject.toml the same as here
+#   scripts/server.sh test [args]      run pytest there, e.g. scripts/server.sh test tests/tvd -q -k "yolo and notebooks"
 #   scripts/server.sh run <command>    run a command there, in the project folder, with the tvd environment first on PATH
 set -euo pipefail
 HOST="${TVD_SERVER:-20.0.14.182}"
@@ -15,12 +15,18 @@ remote() {
 
 case "${1:-}" in
     sync)
-        rsync -az --timeout=60 -e "${SSH[*]}" --exclude '__pycache__/' src tests configs scripts pyproject.toml "$HOST:$REMOTE_DIR/"
+        # --delete removes files deleted or renamed here, so the server never runs a test that no longer exists.
+        # Excluded files are neither copied nor deleted: each machine keeps its own caches and install records.
+        rsync -az --delete --timeout=60 -e "${SSH[*]}" --exclude '__pycache__/' --exclude '*.egg-info/' \
+            src tests configs scripts pyproject.toml "$HOST:$REMOTE_DIR/"
         echo "synced to $HOST:$REMOTE_DIR"
         ;;
     test)
         shift
-        remote python -m pytest "$@"
+        # printf %q quotes each argument again, so that one with spaces reaches pytest as one argument.
+        args=""
+        if [ $# -gt 0 ]; then args=$(printf '%q ' "$@"); fi
+        remote python -m pytest "$args"
         ;;
     run)
         shift
