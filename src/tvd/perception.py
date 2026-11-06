@@ -1,6 +1,9 @@
 """Detection and tracking over a video."""
 
+from collections.abc import Sequence
+
 from tvd.detection import BaseDetector
+from tvd.observers import FrameObserver
 from tvd.tracking import BaseTracker
 from tvd.tracking.history import TrackHistory
 from tvd.video import VideoReader
@@ -13,14 +16,18 @@ def track_video(
     track_classes: set[str],
     start: int = 0,
     stop: int | None = None,
+    observers: Sequence[FrameObserver] = (),
 ) -> TrackHistory:
     """Detect every frame from ``start`` to ``stop``, and track the detections of ``track_classes``.
 
-    It depends only on the two abstractions, so any detector and any tracker work here.
+    Each observer sees every frame with all of its detections, so the video is decoded once for all of
+    them. It depends only on abstractions, so any detector, tracker and observer work here.
     """
     tracker.reset()
     history = TrackHistory()
     for frame in reader.frames(start, stop):
-        detections = [d for d in detector.detect(frame) if d.class_name in track_classes]
-        history.add(frame.index, tracker.update(detections, frame))
+        detections = detector.detect(frame)
+        for observer in observers:
+            observer.observe(frame, detections)
+        history.add(frame.index, tracker.update([d for d in detections if d.class_name in track_classes], frame))
     return history

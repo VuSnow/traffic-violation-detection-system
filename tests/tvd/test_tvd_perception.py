@@ -4,6 +4,7 @@ import pytest
 from conftest import ROOT
 
 from tvd.detection import DETECTORS
+from tvd.observers import DetectionLog, FrameObserver
 from tvd.perception import track_video
 from tvd.tracking import TRACKERS
 from tvd.video import VideoReader
@@ -27,6 +28,21 @@ def test_the_tracker_is_reset_before_each_video(sample_video):
         track_video(reader, DETECTORS.create("test-moving-car"), tracker, {"car"}, 0, 2)
         track_video(reader, DETECTORS.create("test-moving-car"), tracker, {"car"}, 0, 2)
     assert tracker.resets == 2
+
+
+def test_observers_see_every_frame_with_all_its_detections(sample_video):
+    class FrameCounter(FrameObserver):
+        def __init__(self):
+            self.frames = []
+
+        def observe(self, frame, detections):
+            self.frames.append(frame.index)
+
+    counter, log = FrameCounter(), DetectionLog()
+    with VideoReader(sample_video) as reader:
+        track_video(reader, DETECTORS.create("test-moving-car"), TRACKERS.create("test-same-id"), {"car"}, 3, 6, observers=[counter, log])
+    assert counter.frames == [3, 4, 5] and sorted(log.by_frame) == [3, 4, 5]
+    assert [d.class_name for d in log.by_frame[4]] == ["car", "person"]
 
 
 @needs_gpu_stack
