@@ -2,7 +2,7 @@
 
 An AI-assisted traffic violation detection system that analyzes road surveillance videos, identifies potential violations, extracts supporting evidence, and presents cases for human review before a final decision is recorded.
 
-> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–08 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition, event generation, end-to-end baseline) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`, `events.py`, `pipeline.py`). Next: **Notebook 09 — Evaluation & Baseline Analysis**.
+> **Project status:** Early development — Phase 1 (baseline). Notebooks 00–09 and 05b (environment & dataset, video reading, object detection, multi-object tracking, scene configuration, wrong-way and red-light violation rules, license plate recognition, event generation, end-to-end baseline, baseline evaluation) are done and verified on the GPU server; validated reusable code lives in `src/traffic_violation_detection/` (`video.py`, `detection.py`, `tracking.py`, `camera.py`, `scene.py`, `wrong_way.py`, `red_light.py`, `evidence.py`, `plates.py`, `plate_worker.py`, `events.py`, `pipeline.py`, `evaluation.py`). Phase 1 is complete. Next: a review service around `run_pipeline`, and Phase 2.
 >
 > **Academic scope:** This is a specialized academic project and an environment for practicing Computer Vision, AI Engineering, and MLOps. It is not an automated traffic enforcement authority.
 
@@ -55,7 +55,7 @@ Build a working end-to-end pipeline with pretrained models and simple, explainab
 | 06 | `06_license_plate_recognition.ipynb` | Plate localization + OCR over several frames, with explicit unknown/unreadable states | Done (GPU server); labels await human review |
 | 07 | `07_violation_event_generation.ipynb` | Event schema, evidence, `pending` review status, deduplication, simulated review, database interface | Done (GPU server) |
 | 08 | `08_end_to_end_baseline.ipynb` | Full pipeline on a video, simulated review, performance summary | Done (GPU server) |
-| 09 | `09_baseline_evaluation.ipynb` | Measured quality, error analysis, Phase 2 priorities | Planned |
+| 09 | `09_baseline_evaluation.ipynb` | Measured quality against external ground truth and the labels, error analysis, Phase 2 priorities | Done (GPU server); labels await human review |
 
 ### Phase 2 — Model Training & Optimization
 
@@ -101,7 +101,7 @@ Generated outputs, model weights, and any new video under `data/` are git-ignore
 
 ### Image outputs stay local
 
-The images in Notebooks 05b, 06, 07 and 08 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebooks 06, 07 and 08 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
+The images in Notebooks 05b, 06, 07, 08 and 09 show real vehicles and plates, unblurred, so they stay out of git. Text printed in Notebooks 06, 07, 08 and 09 shows only a plate's first two characters and its length. A clean filter removes them when the notebook is staged, while the local file keeps them. The filter is not active in a new clone until you enable it, once:
 
 ```bash
 git config filter.strip-notebook-images.clean "python3 scripts/strip_notebook_images.py"
@@ -209,6 +209,8 @@ Notebooks 00–01 (video reading) run on CPU. Object detection (Notebook 02 onwa
    pip install --no-deps boxmot==26.0.0
    ```
 
+5. For Notebook 09, add the evaluation extra (`pip install -e ".[evaluation]"`, for motmetrics), and put the ground-truth clips in `data/Vehicle_Tracking/`. They are not committed: their origin and licence are not recorded.
+
 Rented instances are often not persistent: copy notebooks and results back (e.g. with `rsync`) before stopping or destroying the instance.
 
 Notebook 00 records the Python version, package versions, and GPU availability of whichever machine runs it.
@@ -271,9 +273,17 @@ Dataset quality, camera placement, traffic-rule definitions, and test methodolog
 
 ## Current Milestone
 
-**Phase 1 / Notebook 09: Evaluation & Baseline Analysis** (next). The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
+**Phase 1 is complete.** Next: a review service around `run_pipeline`, and Phase 2, in the order Notebook 09 recommends. The most valuable additions to the project are a person's review of the red-light and plate labels, and footage with real violations whose plates are sharp and at least about 35–45 px wide, since the whole chain has worked only on a simulated signal.
 
 Footage suited to a red-light rule shows the stop line and the signal of the same lane in one frame, from a fixed camera, over at least one full signal cycle.
+
+Notebook 09 is complete on the GPU server (NVIDIA L40S, 4 CPU cores):
+
+- [x] Detection and tracking measured against external ground truth on two clips (VNTraffic in Hanoi, AICC22-Custom): recall 0.937 and 0.918 at IoU 0.5; MOTA 0.644 and 0.268, IDF1 0.758 and 0.701. The labels leave out real vehicles, so precision and MOTA are lower bounds.
+- [x] Every score gathered with a 95% interval: red light 13/13 precision and 13/14 recall; plates 6/6 texts right and 6/14 readable plates read on video-test; 0 of 17 plates read on real red-light footage.
+- [x] Error patterns and bottlenecks measured, alternatives compared, and Phase 2 priorities ranked. Plate reading on real footage and dense motorbikes come first; the speed bottleneck is CPU work, not detection (16 ms per frame).
+- [ ] **A lower threshold for starting tracks is no cure:** at 0.4 instead of 0.6, vehicles never tracked fall from 9 to 2, but identity switches rise from 40 to 112.
+- [ ] **The scores of the rules and plates rest on labels no person has reviewed.** Filling in `your_verdict` in the review sheet of Notebook 05b and running Notebook 09 again applies a person's review.
 
 Notebook 08 is complete on the GPU server:
 
