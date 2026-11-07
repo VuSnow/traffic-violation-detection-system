@@ -1,6 +1,30 @@
 # The settings of each rule, for every camera. A camera file can change any of them for one camera,
 # under "rules: <rule>: settings:". Changing a value means the scores of Notebooks 05, 05b and 09 no
-# longer apply: every result records the settings that produced it. The red-light rule joins in Task 11.
+# longer apply: every result records the settings that produced it.
+
+red_light:
+  version: 2                    # 1 is the rule scored in Notebook 05b; 2 adds the two settings marked (v2)
+  entry_offset: 0.30            # the front wheels: this fraction of the box height above its bottom
+  pass_margin: 0.5              # the rear must pass the line by this many box heights
+  min_track_frames: 8
+  smoothing_frames: 5           # median filter over a track's positions
+  min_frames_to_decide: 15      # fewer frames left than this: stopped and still moving cannot be told apart
+  still_box_heights: 0.15       # stopped: moved less than this many box heights over those frames
+  min_heading_px: 60            # a shorter movement after the line: heading unknown
+  turn_angle_deg: 35            # more than this from the lane direction is a turn
+  border_margin: 3              # px: a box this close to the image border may be cut off
+  duplicate_seconds: 1.0        # two candidates this close in time ...
+  duplicate_px: 120             # ... and space are one vehicle
+  join_fragments: true          # (v2) join two tracks that are plainly one vehicle
+  join_max_gap_frames: 6
+  join_max_jump_heights: 0.1
+  join_max_size_ratio: 1.25
+  estimate_hidden_entry: true   # (v2) estimate when a vehicle hidden at the line crossed it
+  hidden_fit_frames: 10         # the track's first frames, followed back to the line
+  hidden_max_frames: 30         # an entry further back than this is too uncertain
+  hidden_margin_frames: 13      # the signal must hold this long before the estimated entry: about 0.5 s
+  hidden_min_speed: 0.01        # box heights per frame; slower is a vehicle waiting, not leaving the line
+  signal_smoothing_frames: 7    # majority vote over this many frames, against flicker
 
 wrong_way:
   version: 1
