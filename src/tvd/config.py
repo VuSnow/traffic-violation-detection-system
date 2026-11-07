@@ -43,6 +43,23 @@ class PerceptionConfig(StrictModel):
 M = TypeVar("M", bound=BaseModel)
 
 
+def describe(error: ValidationError, where: str = "") -> str:
+    """Every problem found by pydantic, as place: message, joined by ; . where is put before each place."""
+
+    def place(location: tuple) -> str:
+        return ".".join([where] * bool(where) + [str(part) for part in location]) or "(file)"
+
+    return "; ".join(f"{place(e['loc'])}: {e['msg']}" for e in error.errors())
+
+
+def validate(model: type[M], data: Any, where: str = "") -> M:
+    """Check data already read, such as one section of a file, against ``model``. Problems raise a ``ConfigError``."""
+    try:
+        return model.model_validate(data if data is not None else {})
+    except ValidationError as error:
+        raise ConfigError(describe(error, where)) from error
+
+
 def load_config(path: str | Path, model: type[M]) -> M:
     """Read a YAML file and check it against ``model``. Every problem is reported at once, in a ``ConfigError``."""
     path = Path(path)
@@ -53,7 +70,6 @@ def load_config(path: str | Path, model: type[M]) -> M:
     except yaml.YAMLError as error:
         raise ConfigError(f"{path}: not valid YAML: {error}") from error
     try:
-        return model.model_validate(data if data is not None else {})
-    except ValidationError as error:
-        problems = "; ".join(f"{'.'.join(str(part) for part in e['loc']) or '(file)'}: {e['msg']}" for e in error.errors())
-        raise ConfigError(f"{path}: {problems}") from error
+        return validate(model, data)
+    except ConfigError as error:
+        raise ConfigError(f"{path}: {error}") from error
