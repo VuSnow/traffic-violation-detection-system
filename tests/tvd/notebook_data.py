@@ -110,3 +110,19 @@ def plate_read_from_json(read: dict):
     keys = ("frame", "text", "mean_prob", "min_prob", "has_gap", "detection_confidence", "plate_width", "plate_height")
     return PlateRead(*(read[k] for k in keys), Box(*read["plate_box_xyxy"]), read["rejected"], np.zeros((1, 1, 3), np.uint8))
 
+
+NOTEBOOK_08_EVIDENCE = NOTEBOOK_08 / "events" / "evidence"
+
+
+def clip_from_entry(entry: dict):
+    """A Notebook 08 clip, as tvd describes a clip."""
+    from tvd.evidence import Clip
+
+    start = entry["source_start_frame"]
+    boxes = {b["frame_in_clip"]: Box(*b["box_xyxy"]) for b in entry["vehicle_boxes"]}
+    return Clip(NOTEBOOK_08_CLIPS / entry["clip_file"], start, entry["source_end_frame"], entry["fps"], entry["width"], entry["height"], start + entry["trigger_frame_in_clip"], boxes)
+
+
+def notebook_08_records() -> dict[str, dict]:
+    """Notebook 08's records, by event id. They hold real plate numbers: never print them."""
+    return {r["event_id"]: r for r in load_json(NOTEBOOK_08 / "events" / "traffic_video_modified_review_events.json")["events"]}
