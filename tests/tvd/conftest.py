@@ -6,6 +6,7 @@ import pytest
 
 from tvd.detection import DETECTORS, BaseDetector
 from tvd.domain import Box, Detection, Frame, TrackedObject
+from tvd.plates import PAD, PLATE_MODELS, BasePlateModels, PlateBox, PlateText
 from tvd.signals import SIGNAL_READERS, BaseSignalReader
 from tvd.tracking import TRACKERS, BaseTracker
 
@@ -48,6 +49,27 @@ class FixedStateReader(BaseSignalReader):
 
     def read(self, image) -> str:
         return self.state
+
+
+@PLATE_MODELS.register("test-plate")
+class FakePlateModels(BasePlateModels):
+    """Finds one plate in the lower middle of every image, a quarter of its width, and reads ``text`` on it with confidence ``prob``."""
+
+    def __init__(self, text: str = "TEST1234", prob: float = 0.99) -> None:
+        self.text = text
+        self.prob = prob
+        self.closed = False
+
+    def detect(self, image) -> list[PlateBox]:
+        height, width = image.shape[:2]
+        return [PlateBox(Box(0.375 * width, 0.8 * height, 0.625 * width, 0.9 * height), 0.9)]
+
+    def recognize(self, plate) -> PlateText:
+        characters = self.text.ljust(9, PAD)
+        return PlateText(characters, tuple(self.prob if c != PAD else 1.0 for c in characters))
+
+    def close(self) -> None:
+        self.closed = True
 
 
 @pytest.fixture

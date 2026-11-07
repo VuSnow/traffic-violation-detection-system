@@ -1,0 +1,18 @@
+# How plates are read, for every camera. Every record stores these settings. The values are those of Notebook 06.
+version: 1
+models:                       # what finds and reads plates; change "type" to swap the implementation
+  type: onnx_worker           # both models in a process of their own, on the GPU when there is one
+  options:
+    detector_model: yolo-v9-t-640-license-plate-end2end
+    ocr_model: cct-s-v2-global-model
+    cpu_threads: 8            # only for what ONNX runs on the CPU, such as on a machine with no GPU
+reading:
+  frames_per_track: 12        # the frames where the vehicle looks largest
+  min_frame_gap: 4            # neighbouring frames are nearly the same, so they would not be independent votes
+  vehicle_margin: 0.15        # a box can cut off the plate, so the crop extends beyond it
+  lowest_plate_center: 0.4    # a plate's centre is below this fraction of the box height: this rejects roof signs
+  min_plate_width: 30         # px; narrower plates are too small to read
+  min_chars: 4
+  min_char_prob: 0.95         # the least sure character of a usable read; a wrong plate is worse than none, so this is strict
+  min_votes: 2                # frames that must agree for "read"
+  min_agreement: 0.67         # the share of usable frames that must agree: 2 of 3 is not enough, and 3 of 4 is
