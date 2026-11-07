@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-11-07-review-service-design.md` (Sections 4, 5 and 12).
 
-**Verified:** every file below, the state before each task's code (with the failure it shows) and the state after it were run on ai_server_2 before this plan was written. After the last task: 144 tests pass in `tests/tvd`, and `check` gives the outcomes of Notebook 08 on `traffic_video_modified.mp4` and of Notebook 05 on `video-test.mp4`.
+**Verified:** every file below, the state before each task's code (with the failure it shows) and the state after it were run on ai_server_2 before this plan was written. After the last task: 146 tests pass in `tests/tvd`, and `check` gives the outcomes of Notebook 08 on `traffic_video_modified.mp4` and of Notebook 05 on `video-test.mp4`.
 
 ## The five parts
 
@@ -1221,6 +1221,15 @@ def test_glow_reads_its_colour():
     assert SIGNAL_READERS.create("glow", roi=[0, 0, 64, 64]).read(image_with("green", size=10)) == "green"
 
 
+def test_glow_with_an_empty_box_is_refused():
+    with pytest.raises(ValueError, match="is empty"):
+        SIGNAL_READERS.create("glow", roi=[10, 10, 10, 20])
+
+
+def test_glow_outside_the_image_is_unknown():
+    assert SIGNAL_READERS.create("glow", roi=[100, 100, 120, 120]).read(image_with("green")) == "unknown"
+
+
 @pytest.mark.parametrize("states, expected", [
     (["red", "red"], "red"), (["red", "unknown"], "red"), (["unknown", "unknown"], "unknown"), (["red", "green"], "conflict"), ([], "unknown"),
 ])
@@ -1349,18 +1358,24 @@ from tvd.signals.base import GREEN, RED, SIGNAL_READERS, UNKNOWN, YELLOW, BaseSi
 class GlowReader(BaseSignalReader):
     """Counts lit pixels of each colour in a box around one head (``roi``, as ``[x1, y1, x2, y2]``).
 
-    A monochrome (infrared) image has no colour to read, and gives ``unknown``. A colour wins if it has
-    at least ``min_pixels`` and twice as many as the others together.
+    A monochrome (infrared) image has no colour to read, and gives ``unknown``, as does a box outside the
+    image. A colour wins if it has at least ``min_pixels`` and twice as many as the others together.
     """
 
     def __init__(self, roi: list[int], min_pixels: int = 12, min_mean_saturation: float = 8) -> None:
         self.roi = tuple(int(v) for v in roi)
+        x1, y1, x2, y2 = self.roi
+        if x2 <= x1 or y2 <= y1:
+            raise ValueError(f"The glow box {list(self.roi)} is empty: it needs x2 > x1 and y2 > y1")
         self.min_pixels = min_pixels
         self.min_mean_saturation = min_mean_saturation
 
     def read(self, image: np.ndarray) -> str:
         x1, y1, x2, y2 = self.roi
-        hsv = cv2.cvtColor(image[y1:y2, x1:x2], cv2.COLOR_BGR2HSV)
+        patch = image[max(0, y1):y2, max(0, x1):x2]
+        if patch.size == 0:
+            return UNKNOWN
+        hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
         hue, saturation, value = hsv[..., 0], hsv[..., 1], hsv[..., 2]
         if saturation.mean() < self.min_mean_saturation:
             return UNKNOWN
@@ -1391,7 +1406,7 @@ __all__ = ["CONFLICT", "GREEN", "RED", "SIGNAL_READERS", "UNKNOWN", "YELLOW", "B
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `83 passed`.
+Expected: `85 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -1541,6 +1556,15 @@ def test_glow_reads_its_colour():
     assert SIGNAL_READERS.create("glow", roi=[0, 0, 64, 64]).read(image_with("green", size=10)) == "green"
 
 
+def test_glow_with_an_empty_box_is_refused():
+    with pytest.raises(ValueError, match="is empty"):
+        SIGNAL_READERS.create("glow", roi=[10, 10, 10, 20])
+
+
+def test_glow_outside_the_image_is_unknown():
+    assert SIGNAL_READERS.create("glow", roi=[100, 100, 120, 120]).read(image_with("green")) == "unknown"
+
+
 @pytest.mark.parametrize("states, expected", [
     (["red", "red"], "red"), (["red", "unknown"], "red"), (["unknown", "unknown"], "unknown"), (["red", "green"], "conflict"), ([], "unknown"),
 ])
@@ -1670,7 +1694,7 @@ __all__ = [
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `87 passed`.
+Expected: `89 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -2006,7 +2030,7 @@ __all__ = ["RULES", "BaseRule", "Finding", "Observation", "RuleResult"]
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `91 passed`.
+Expected: `93 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -2426,7 +2450,7 @@ wrong_way:
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `101 passed`.
+Expected: `103 passed`.
 
 `test_the_same_results_as_the_notebooks[True]` plays the 136 tracks of `video-test.mp4` backwards and must find the same wrong-way candidates as the notebook's rule. If it fails, print the first track whose verdict differs, and compare its windows with `notebook.track_windows`.
 
@@ -2573,7 +2597,7 @@ def join_fragments(
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `107 passed`.
+Expected: `109 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -3110,7 +3134,7 @@ wrong_way:
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `126 passed`.
+Expected: `128 passed`.
 
 `test_the_same_results_as_the_notebooks_on_every_clip` runs 4 variants of 18 clips in a few seconds. It is the proof that the rule was rewritten without changing a single record.
 
@@ -3346,7 +3370,7 @@ rules:
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `134 passed`.
+Expected: `136 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -3512,7 +3536,7 @@ def build_rules(camera: CameraConfig, defaults: dict[str, dict[str, Any]]) -> li
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `138 passed`.
+Expected: `140 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -3773,7 +3797,7 @@ def check_video(
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `142 passed`.
+Expected: `144 passed`.
 
 `test_the_same_crossings_as_the_notebooks_from_the_video` is the whole Phase 1 chain on clip C, from pixels to records: YOLO, OC-SORT, the night signal reader, the joins and the rule. It takes about 15 s.
 
@@ -4000,7 +4024,7 @@ if __name__ == "__main__":
 scripts/server.sh sync && scripts/server.sh test tests/tvd -q
 ```
 
-Expected: `144 passed`.
+Expected: `146 passed`.
 
 - [ ] **Step 5: Check the red-light camera, which moves**
 
@@ -4082,7 +4106,7 @@ git commit -m "Add the check command"
 
 ## When Part 2 is done
 
-- [ ] `scripts/server.sh test tests/tvd -q` gives `144 passed`, and `scripts/server.sh test -q` still passes the notebooks' tests too.
+- [ ] `scripts/server.sh test tests/tvd -q` gives `146 passed`, and `scripts/server.sh test -q` still passes the notebooks' tests too.
 - [ ] `check` gives the outcomes of Notebook 08 on `traffic_video_modified.mp4` and of Notebook 05 on `video-test.mp4`.
 - [ ] Changing a setting for one camera changes that camera's results, and no code.
 - [ ] You can say, for each of the five SOLID principles, where it is in `src/tvd/rules/` and `src/tvd/signals/`.
