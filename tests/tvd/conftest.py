@@ -14,14 +14,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 @DETECTORS.register("test-moving-car")
 class MovingCarDetector(BaseDetector):
-    """A car that moves right by ``step`` px per frame, and a person who stands still."""
+    """A car that moves by ``step`` px to the right and ``step_y`` px down per frame, and a person who stands still."""
 
-    def __init__(self, step: float = 5.0) -> None:
+    def __init__(self, step: float = 5.0, step_y: float = 0.0) -> None:
         self.step = step
+        self.step_y = step_y
 
     def detect(self, frame: Frame) -> list[Detection]:
-        x = 10 + self.step * frame.index
-        return [Detection(Box(x, 50, x + 40, 80), 2, "car", 0.9), Detection(Box(0, 0, 10, 30), 0, "person", 0.8)]
+        x, y = 10 + self.step * frame.index, 50 + self.step_y * frame.index
+        return [Detection(Box(x, y, x + 40, y + 30), 2, "car", 0.9), Detection(Box(0, 0, 10, 30), 0, "person", 0.8)]
 
 
 @TRACKERS.register("test-same-id")
