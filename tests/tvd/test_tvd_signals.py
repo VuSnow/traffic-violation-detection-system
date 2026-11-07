@@ -41,6 +41,15 @@ def test_glow_reads_its_colour():
     assert SIGNAL_READERS.create("glow", roi=[0, 0, 64, 64]).read(image_with("green", size=10)) == "green"
 
 
+def test_glow_with_an_empty_box_is_refused():
+    with pytest.raises(ValueError, match="is empty"):
+        SIGNAL_READERS.create("glow", roi=[10, 10, 10, 20])
+
+
+def test_glow_outside_the_image_is_unknown():
+    assert SIGNAL_READERS.create("glow", roi=[100, 100, 120, 120]).read(image_with("green")) == "unknown"
+
+
 @pytest.mark.parametrize("states, expected", [
     (["red", "red"], "red"), (["red", "unknown"], "red"), (["unknown", "unknown"], "unknown"), (["red", "green"], "conflict"), ([], "unknown"),
 ])
