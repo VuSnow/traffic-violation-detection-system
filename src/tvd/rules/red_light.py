@@ -290,4 +290,5 @@ class RedLightRule(BaseRule):
                 **{k: record[k] for k in ("x", "lane", "signal_group", "signal_state", "movement", "entry_seen", "entry_estimated", "box_xyxy")},
                 "signal_source": self.scene.signal_source,
             },
+            points=tuple(points),
         )

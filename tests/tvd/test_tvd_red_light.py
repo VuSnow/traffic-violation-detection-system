@@ -136,3 +136,20 @@ def test_the_same_results_as_the_notebooks_on_every_clip(version, moving):
         assert [(f.track_id, f.class_name, f.trigger_frame, f.why, f.evidence) for f in result.findings] == [
             (e["track_id"], e["class_name"], e["trigger_frame"], e["why"], {**e["evidence"], "signal_source": "camera"}) for e in events
         ], clip_name
+
+
+@needs_stored_clips
+def test_a_finding_keeps_the_points_of_the_track_as_the_notebooks_join_it():
+    from traffic_violation_detection import red_light as notebook
+
+    joined_findings = 0
+    for clip_name in load_json(RED_LIGHT_SCENE)["clips"]:
+        scene, clip, tracks, states = notebook_inputs(clip_name)
+        joined = notebook.join_clip_tracks(tracks, None, notebook.RULE)
+        section = red_light_section(scene, clip_name)
+        rule = RedLightRule(section["scene"], {**SETTINGS, **section["settings"]})
+        observation = Observation(history_from_rows(tracks).tracks, CameraMotion(), 30.0, 1280, 720, clip["start"], clip["end"])
+        for finding in rule.judge(observation, SignalTimeline(states)).findings:
+            assert [[p.frame_index, *p.box.as_list()] for p in finding.points] == [row[:5] for row in joined[finding.track_id]], clip_name
+            joined_findings += "+" in finding.track_id
+    assert joined_findings > 0  # Some candidates are joined tracks, so the joining is compared too.

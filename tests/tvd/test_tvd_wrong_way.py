@@ -104,3 +104,8 @@ def test_the_same_results_as_the_notebooks(reverse):
     assert sorted(([f.track_id, f.class_name, f.start_frame, f.trigger_frame, f.end_frame, f.why, f.evidence] for f in result.findings), key=lambda f: (f[3], f[0])) == [
         [e["track_id"], e["class_name"], e["start_frame"], e["trigger_frame"], e["end_frame"], e["why"], {"region_id": e["region_id"], **e["evidence"]}] for e in events
     ]
+
+
+def test_a_finding_keeps_every_point_of_its_track():
+    (finding,) = judge(60, dy=3).findings
+    assert [p.frame_index for p in finding.points] == list(range(60)) and finding.points[0].box == Box(300, 100, 340, 130)

@@ -78,3 +78,8 @@ def test_the_same_crossings_as_the_notebooks_from_the_video(monkeypatch):
             {"bicycle", "car", "motorcycle", "bus", "truck"}, build_motion_estimator(camera.motion), build_rules(camera, DEFAULTS), clip["start"], clip["end"],
         )
     assert result.results["red_light"].records == expected and len(result.results["red_light"].findings) == 2
+
+
+def test_the_json_leaves_out_the_points_of_each_finding(sample_video):
+    findings = [f for rule in run(sample_video).as_json()["rules"].values() for f in rule["findings"]]
+    assert len(findings) == 2 and all("points" not in f for f in findings)

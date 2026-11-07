@@ -23,7 +23,7 @@ from scipy.ndimage import median_filter
 from tvd.config import StrictModel, validate
 from tvd.geometry import point_in_polygon
 from tvd.rules.base import RULES, BaseRule, Finding, Observation, RuleResult
-from tvd.tracking.history import Track
+from tvd.tracking.history import Track, TrackPoint
 
 CANDIDATE = "candidate"
 NO_VIOLATION = "no_violation"
@@ -107,7 +107,7 @@ class WrongWayRule(BaseRule):
             path = self.measure(track, observation)
             verdict, evaluable, groups = self._judge(path, durations)
             records.append({"track_id": path.track_id, "verdict": verdict, "evaluable_windows": evaluable})
-            findings += [self._finding(path, group) for group in groups]
+            findings += [self._finding(path, group, track.points) for group in groups]
         findings.sort(key=lambda f: f.trigger_frame)
         return RuleResult(findings, records, self.settings.model_dump())
 
@@ -208,7 +208,7 @@ class WrongWayRule(BaseRule):
                 groups.append([window])
         return groups
 
-    def _finding(self, path: TrackPath, group: list[dict]) -> Finding:
+    def _finding(self, path: TrackPath, group: list[dict], points: list[TrackPoint]) -> Finding:
         first, last = group[0], group[-1]
         best = max(group, key=lambda w: w["opposing_heights"])
         start, trigger, end = first["start_frame"], first["end_frame"], last["end_frame"]
@@ -229,4 +229,5 @@ class WrongWayRule(BaseRule):
                 "angle_to_opposite_deg": round(best["angle_to_opposite_deg"], 1),
                 "evidence_frames": [start, trigger, end],
             },
+            points=tuple(points),
         )

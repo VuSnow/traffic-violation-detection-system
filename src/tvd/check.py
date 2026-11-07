@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 from tvd.camera import CameraConfig
@@ -31,7 +31,7 @@ class CheckResult:
         return {
             "video": self.video, "camera_id": self.camera_id, "frames": self.frames, "fps": self.fps, "tracks": self.tracks, "seconds": self.seconds,
             "rules": {
-                name: {"settings": r.settings, "verdicts": r.verdict_counts(), "findings": [asdict(f) for f in r.findings], "records": r.records}
+                name: {"settings": r.settings, "verdicts": r.verdict_counts(), "findings": [f.as_json() for f in r.findings], "records": r.records}
                 for name, r in self.results.items()
             },
         }

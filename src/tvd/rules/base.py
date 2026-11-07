@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from typing import Any
 
 from tvd.motion import CameraMotion
 from tvd.observers import FrameObserver
 from tvd.registry import Registry
-from tvd.tracking.history import Track
+from tvd.tracking.history import Track, TrackPoint
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,7 @@ class Finding:
     """A candidate violation, for a person to review. A rule never decides that a violation happened.
 
     ``start_frame`` to ``end_frame`` is the stretch of video that shows it; ``trigger_frame`` is the moment the rule fired.
+    ``points`` are the vehicle in every frame of its track, in frame pixels: where clips and plate reading find it.
     """
 
     rule: str
@@ -41,6 +42,11 @@ class Finding:
     end_frame: int
     why: str
     evidence: dict[str, Any] = field(default_factory=dict)
+    points: tuple[TrackPoint, ...] = ()
+
+    def as_json(self) -> dict[str, Any]:
+        """Everything but the points: they are many, and the evidence keeps the vehicle's boxes in its clip."""
+        return {f.name: getattr(self, f.name) for f in fields(self) if f.name != "points"}
 
 
 @dataclass
