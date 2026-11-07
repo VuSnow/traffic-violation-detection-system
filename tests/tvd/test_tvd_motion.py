@@ -1,12 +1,18 @@
 import numpy as np
 import pytest
 
+from tvd.domain import Box, Detection
 from tvd.motion import MOTION_ESTIMATORS, CameraMotion
+from tvd.motion.orb import OrbMotionEstimator
 from tvd.video import VideoReader
 
 
-def test_the_fixed_camera_is_registered():
-    assert "fixed" in MOTION_ESTIMATORS.names()
+def detections_at(index: int) -> list[Detection]:
+    return [Detection(Box(100 + index, 100, 200 + index, 180), 2, "car", 0.9), Detection(Box(300, 20, 320, 60), 9, "traffic light", 0.8)]
+
+
+def test_the_estimators_are_registered():
+    assert {"fixed", "orb"} <= set(MOTION_ESTIMATORS.names())
 
 
 def test_a_fixed_camera_leaves_points_unchanged(sample_video):
@@ -25,3 +31,25 @@ def test_a_moving_camera_maps_both_ways():
 def test_a_frame_outside_the_estimate_is_refused():
     with pytest.raises(IndexError, match="Frame 102 is outside"):
         CameraMotion(np.zeros((2, 4)), first_frame=100).params_at(102)
+
+
+def test_the_reference_frame_must_be_analysed(sample_video):
+    with VideoReader(sample_video) as reader, pytest.raises(ValueError, match="Reference frame 50 is outside"):
+        OrbMotionEstimator(reference_frame=50).estimate(reader, {}, 0, 10)
+
+
+def test_the_mask_hides_moving_objects_and_drawn_areas_only():
+    mask = OrbMotionEstimator(reference_frame=0, excluded_areas=[[0, 0, 5, 5]], mask_margin=2).static_mask((360, 640), detections_at(0))
+    assert mask[0, 0] == 0 and mask[100, 98] == 0 and mask[100, 97] == 255  # Excluded area; a car's box plus its 2 px margin.
+    assert mask[30, 310] == 255  # A traffic light is part of the scene.
+
+
+def test_the_same_motion_as_the_notebooks(sample_video):
+    from traffic_violation_detection.camera import estimate_camera_motion
+
+    stop, reference = 40, 20
+    notebook_detections = [[{"class_name": d.class_name, "bbox_xyxy": d.box.as_list()} for d in detections_at(k)] for k in range(stop)]
+    expected = estimate_camera_motion(sample_video, notebook_detections, reference)
+    with VideoReader(sample_video) as reader:
+        motion = OrbMotionEstimator(reference_frame=reference).estimate(reader, {k: detections_at(k) for k in range(stop)}, 0, stop)
+    assert np.array_equal(np.array([motion.params_at(k) for k in range(stop)]), expected)
