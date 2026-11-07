@@ -1,0 +1,13 @@
+# How each candidate's evidence is cut and kept, for every camera. Every record stores these settings.
+version: 1
+clip:                     # original pixels, cut in time only
+  pre_seconds: 3.0        # at least this long before the trigger
+  max_pre_seconds: 10.0   # a long track is followed back no further than this
+  post_seconds: 2.0
+  crf: 14                 # H.264 quality, lower is better: 14 is close to lossless, so a plate stays as readable as in the source
+images:                   # three images per candidate: before, at and after the trigger
+  offset_seconds: 0.7     # how far the images before and after are from the trigger
+  jpeg_quality: 90
+  box_tolerance_frames: 3 # the vehicle's box is drawn if it was tracked this close to the image's frame
+records:
+  duplicate_seconds: 5.0  # two records of one rule, this close in time, of one track or one read plate, are one occurrence

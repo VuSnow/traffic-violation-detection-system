@@ -70,3 +70,24 @@ def history_from_rows(tracks: dict[str, list]) -> TrackHistory:
 
 def load_json(path: Path):
     return json.loads(path.read_text())
+
+
+MODIFIED_VIDEO = ROOT / "data" / "traffic_video_modified.mp4"
+NOTEBOOK_08 = OUTPUTS / "08_end_to_end_baseline" / "traffic_video_modified"
+NOTEBOOK_08_CLIPS = NOTEBOOK_08 / "violations" / "traffic_video_modified_violation_clips"
+
+
+def notebook_08_clips() -> list[dict]:
+    """The manifest entries of the two red-light clips that Notebook 08 cut from traffic_video_modified.mp4."""
+    return load_json(NOTEBOOK_08_CLIPS / "manifest.json")["clips"]
+
+
+def finding_from_clip(entry: dict):
+    """A red-light finding with the vehicle boxes and trigger of a Notebook 08 clip: enough to cut the same clip again."""
+    from tvd.rules import Finding
+    from tvd.tracking.history import TrackPoint
+
+    start = entry["source_start_frame"]
+    points = tuple(TrackPoint(start + b["frame_in_clip"], Box(*b["box_xyxy"]), 0.9, entry["vehicle_class"]) for b in entry["vehicle_boxes"])
+    trigger = start + entry["trigger_frame_in_clip"]
+    return Finding("red_light", entry["event_id"].rsplit("-t", 1)[1], entry["vehicle_class"], points[0].frame_index, trigger, points[-1].frame_index, "", {}, points)
