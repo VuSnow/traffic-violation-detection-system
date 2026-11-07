@@ -91,3 +91,22 @@ def finding_from_clip(entry: dict):
     points = tuple(TrackPoint(start + b["frame_in_clip"], Box(*b["box_xyxy"]), 0.9, entry["vehicle_class"]) for b in entry["vehicle_boxes"])
     trigger = start + entry["trigger_frame_in_clip"]
     return Finding("red_light", entry["event_id"].rsplit("-t", 1)[1], entry["vehicle_class"], points[0].frame_index, trigger, points[-1].frame_index, "", {}, points)
+
+
+NOTEBOOK_08_PLATES = NOTEBOOK_08 / "plates"
+
+
+def notebook_08_plates() -> dict[str, dict]:
+    """Notebook 08's plate result for each clip, by event id. They hold real plate numbers: never print them."""
+    return {e["event_id"]: e for e in load_json(NOTEBOOK_08_PLATES / "plates.json")["events"]}
+
+
+def plate_read_from_json(read: dict):
+    """A read that the notebooks saved. Its image was not saved: it is replaced by one black pixel."""
+    import numpy as np
+
+    from tvd.plates import PlateRead
+
+    keys = ("frame", "text", "mean_prob", "min_prob", "has_gap", "detection_confidence", "plate_width", "plate_height")
+    return PlateRead(*(read[k] for k in keys), Box(*read["plate_box_xyxy"]), read["rejected"], np.zeros((1, 1, 3), np.uint8))
+
