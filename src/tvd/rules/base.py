@@ -7,6 +7,7 @@ from collections import Counter
 from dataclasses import dataclass, field, fields
 from typing import Any
 
+from tvd.drawing import FrameOverlay
 from tvd.motion import CameraMotion
 from tvd.observers import FrameObserver
 from tvd.registry import Registry
@@ -51,11 +52,15 @@ class Finding:
 
 @dataclass
 class RuleResult:
-    """A rule's findings, a record of how it judged each track, and the settings it used."""
+    """A rule's findings, a record of how it judged each track, and the settings it used.
+
+    ``overlay``, if the rule has one, draws on an evidence image what the rule saw at that frame.
+    """
 
     findings: list[Finding]
     records: list[dict[str, Any]]
     settings: dict[str, Any]
+    overlay: FrameOverlay | None = None
 
     def verdict_counts(self) -> dict[str, int]:
         return dict(Counter(r["verdict"] for r in self.records))

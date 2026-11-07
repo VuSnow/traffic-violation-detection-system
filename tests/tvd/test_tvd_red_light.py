@@ -8,7 +8,7 @@ from tvd.config import ConfigError
 from tvd.domain import Box, Frame, TrackedObject
 from tvd.motion import CameraMotion
 from tvd.rules import RULES, Observation
-from tvd.rules.red_light import RedLightRule
+from tvd.rules.red_light import RedLightOverlay, RedLightRule
 from tvd.signals import SignalTimeline
 from tvd.tracking.history import TrackHistory
 
@@ -153,3 +153,28 @@ def test_a_finding_keeps_the_points_of_the_track_as_the_notebooks_join_it():
             assert [[p.frame_index, *p.box.as_list()] for p in finding.points] == [row[:5] for row in joined[finding.track_id]], clip_name
             joined_findings += "+" in finding.track_id
     assert joined_findings > 0  # Some candidates are joined tracks, so the joining is compared too.
+
+
+MAGENTA = [255, 0, 255]
+
+
+def test_the_overlay_draws_the_stop_line_and_the_signal_state():
+    overlay = judge(car_up()).overlay
+    image = np.zeros((360, 640, 3), np.uint8)
+    overlay.draw(image, 31)
+    assert overlay.lines(31) == [("through signal: red", (0, 0, 255))]  # The left group has no heads here, so it is not shown.
+    assert image[200, 320].tolist() == MAGENTA and (image[:40, :300] == [0, 0, 255]).all(axis=2).any()
+
+
+def test_the_overlay_follows_a_moving_camera():
+    motion = CameraMotion(np.tile([1.0, 0.0, 0.0, 10.0], (60, 1)))  # Each frame is 10 px above the reference frame.
+    signals = SignalTimeline({"through": {5: "green"}})
+    overlay = RedLightOverlay([(0, 200), (640, 200)], motion, signals, ["through"], "camera")
+    image = np.zeros((360, 640, 3), np.uint8)
+    overlay.draw(image, 5)
+    assert image[190, 320].tolist() == MAGENTA and image[200, 320].tolist() != MAGENTA and overlay.lines(5) == [("through signal: green", (0, 200, 0))]
+
+
+def test_a_simulated_signal_says_so_on_the_image():
+    overlay = RedLightOverlay([(0, 200), (640, 200)], CameraMotion(), SignalTimeline({"through": {}}), ["through"], "simulated_overlay")
+    assert overlay.lines(0) == [("through signal: unknown", (170, 170, 170)), ("signal source: simulated_overlay", (255, 255, 255))]

@@ -15,16 +15,18 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
+import cv2
 import numpy as np
 from pydantic import Field, field_validator
 from scipy.ndimage import median_filter
 
 from tvd.config import StrictModel, validate
+from tvd.drawing import FrameOverlay, draw_label
 from tvd.geometry import polyline_y
 from tvd.motion import CameraMotion
 from tvd.observers import FrameObserver
 from tvd.rules.base import RULES, BaseRule, Finding, Observation, RuleResult
-from tvd.signals import SIGNAL_READERS, UNKNOWN, SignalMonitor, SignalTimeline
+from tvd.signals import GREEN, RED, SIGNAL_READERS, UNKNOWN, YELLOW, SignalMonitor, SignalTimeline
 from tvd.tracking.fragments import join_fragments
 from tvd.tracking.history import TrackPoint, majority_class
 
@@ -140,6 +142,35 @@ def reference_box(point: TrackPoint, motion: CameraMotion) -> list[float]:
     return [float(x - width / 2), float(y - height), float(x + width / 2), float(y)]
 
 
+STATE_COLORS = {RED: (0, 0, 255), YELLOW: (0, 200, 255), GREEN: (0, 200, 0)}  # BGR; any other state is gray.
+STOP_LINE_COLOR = (255, 0, 255)  # Magenta: no signal shows this colour.
+
+
+class RedLightOverlay(FrameOverlay):
+    """The stop line where it was in each frame, and the state the rule read for each signal group then."""
+
+    def __init__(self, stop_line: list[tuple[float, float]], motion: CameraMotion, signals: SignalTimeline, groups: list[str], signal_source: str) -> None:
+        self.stop_line = stop_line
+        self.motion = motion
+        self.signals = signals
+        self.groups = groups
+        self.signal_source = signal_source
+
+    def lines(self, frame_index: int) -> list[tuple[str, tuple[int, int, int]]]:
+        lines = []
+        for group in self.groups:
+            state = self.signals.state(group, frame_index)
+            lines.append((f"{group} signal: {state}", STATE_COLORS.get(state, (170, 170, 170))))
+        if self.signal_source != "camera":
+            lines.append((f"signal source: {self.signal_source}", (255, 255, 255)))
+        return lines
+
+    def draw(self, image: np.ndarray, frame_index: int) -> None:
+        line = self.motion.to_frame(frame_index, self.stop_line)  # The camera file draws the line on the reference frame.
+        cv2.polylines(image, [np.round(line).astype(np.int32)], False, STOP_LINE_COLOR, max(2, image.shape[0] // 360), cv2.LINE_AA)
+        draw_label(image, self.lines(frame_index))
+
+
 @RULES.register("red_light")
 class RedLightRule(BaseRule):
     name = "red_light"
@@ -167,7 +198,9 @@ class RedLightRule(BaseRule):
         records = [self.crossing(track_id, points, observation, signals) for track_id, points in tracks.items()]
         records = self.deduplicate([r for r in records if r], observation.fps)
         findings = [self._finding(r, tracks[r["track_id"]], observation.fps) for r in records if r["verdict"] == CANDIDATE]
-        return RuleResult(findings, records, s.model_dump())
+        groups = [group for group in SIGNAL_GROUPS if getattr(self.scene.signals, group)]  # A group without heads is never drawn.
+        overlay = RedLightOverlay(self.scene.stop_line, motion, signals, groups, self.scene.signal_source)
+        return RuleResult(findings, records, s.model_dump(), overlay)
 
     def lane_of(self, x: float) -> str:
         dividers = self.scene.lane_dividers

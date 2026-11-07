@@ -39,3 +39,7 @@ def test_a_finding_keeps_its_vehicle_but_leaves_it_out_of_its_json():
     assert finding.as_json() == {
         "rule": "wrong_way", "track_id": "7", "class_name": "car", "start_frame": 10, "trigger_frame": 11, "end_frame": 11, "why": "why", "evidence": {"region_id": "road"},
     }
+
+
+def test_a_rule_has_no_overlay_unless_it_draws_one():
+    assert RuleResult([], [], {}).overlay is None
