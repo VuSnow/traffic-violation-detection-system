@@ -5,7 +5,7 @@ from conftest import ROOT
 
 from tvd.camera import CameraConfig, load_rule_defaults
 from tvd.config import ComponentConfig, ConfigError
-from tvd.factory import build_detector, build_motion_estimator, build_rules, build_tracker
+from tvd.factory import build_detector, build_motion_estimator, build_plate_models, build_rules, build_tracker
 
 needs_boxmot = pytest.mark.skipif(importlib.util.find_spec("boxmot") is None, reason="Needs BoxMOT, as on the GPU server.")
 
@@ -66,3 +66,13 @@ def test_a_misspelt_camera_setting_is_named():
 
 def test_the_motion_estimator_is_built_by_its_name():
     assert build_motion_estimator(ComponentConfig(type="orb", options={"reference_frame": 5})).reference_frame == 5
+
+
+def test_plate_models_are_built_by_their_name():
+    with build_plate_models(ComponentConfig(type="test-plate", options={"text": "FAKE9999"})) as models:
+        assert models.text == "FAKE9999"
+
+
+def test_a_misspelt_plate_model_option_is_reported():
+    with pytest.raises(ConfigError, match="onnx_worker: .*unexpected keyword argument 'ocr'"):
+        build_plate_models(ComponentConfig(type="onnx_worker", options={"ocr": "cct-s-v2-global-model"}))

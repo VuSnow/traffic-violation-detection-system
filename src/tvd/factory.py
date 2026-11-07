@@ -10,6 +10,7 @@ from tvd.camera import CameraConfig, effective_settings
 from tvd.config import ComponentConfig, ConfigError
 from tvd.detection import DETECTORS, BaseDetector
 from tvd.motion import MOTION_ESTIMATORS, BaseMotionEstimator
+from tvd.plates import PLATE_MODELS, BasePlateModels
 from tvd.registry import Registry
 from tvd.rules import RULES, BaseRule
 from tvd.tracking import TRACKERS, BaseTracker
@@ -34,6 +35,10 @@ def build_tracker(config: ComponentConfig) -> BaseTracker:
 
 def build_motion_estimator(config: ComponentConfig) -> BaseMotionEstimator:
     return build(MOTION_ESTIMATORS, config)
+
+
+def build_plate_models(config: ComponentConfig) -> BasePlateModels:
+    return build(PLATE_MODELS, config)
 
 
 def build_rules(camera: CameraConfig, defaults: dict[str, dict[str, Any]]) -> list[BaseRule]:
