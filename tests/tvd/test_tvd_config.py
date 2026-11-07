@@ -2,7 +2,7 @@ import pytest
 from conftest import ROOT
 from pydantic import ValidationError
 
-from tvd.config import ConfigError, PerceptionConfig, load_config, validate
+from tvd.config import ConfigError, PerceptionConfig, file_version, load_config, validate
 
 GOOD = """
 detector:
@@ -80,3 +80,11 @@ def test_settings_cannot_change_after_loading(tmp_path):
 def test_a_section_is_checked_with_its_place_in_the_file():
     with pytest.raises(ConfigError, match="rules.red_light.tracker: Field required"):
         validate(PerceptionConfig, {"detector": {"type": "x"}, "track_classes": ["car"]}, "rules.red_light")
+
+
+def test_a_file_version_changes_with_its_content(tmp_path):
+    path = tmp_path / "rules.yaml"
+    path.write_text("window_seconds: 2.0\n")
+    first = file_version(path)
+    path.write_text("window_seconds: 2.5\n")
+    assert first.startswith("sha256:") and len(first) == len("sha256:") + 12 and file_version(path) != first

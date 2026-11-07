@@ -30,12 +30,12 @@ needs_gpu_and_rlr = pytest.mark.skipif(
 )
 
 
-def run(sample_video, camera: dict = CAMERA):
+def run(sample_video, camera: dict = CAMERA, start: int = 0):
     config = CameraConfig.model_validate(camera)
     with VideoReader(sample_video) as reader:
         return check_video(
             reader, config, build_detector(ComponentConfig(type="test-moving-car", options={"step": 0, "step_y": 1})),
-            build_tracker(ComponentConfig(type="test-same-id")), {"car"}, build_motion_estimator(config.motion), build_rules(config, DEFAULTS),
+            build_tracker(ComponentConfig(type="test-same-id")), {"car"}, build_motion_estimator(config.motion), build_rules(config, DEFAULTS), start,
         )
 
 
@@ -83,3 +83,8 @@ def test_the_same_crossings_as_the_notebooks_from_the_video(monkeypatch):
 def test_the_json_leaves_out_the_points_of_each_finding(sample_video):
     findings = [f for rule in run(sample_video).as_json()["rules"].values() for f in rule["findings"]]
     assert len(findings) == 2 and all("points" not in f for f in findings)
+
+
+def test_the_first_frame_analysed_is_kept(sample_video):
+    result = run(sample_video, start=100)
+    assert (result.first_frame, result.frames, result.as_json()["first_frame"]) == (100, 140, 100)

@@ -26,10 +26,12 @@ class CheckResult:
     tracks: int
     seconds: float
     results: dict[str, RuleResult]
+    first_frame: int = 0  # The analysed frames are first_frame to first_frame + frames.
 
     def as_json(self) -> dict[str, Any]:
         return {
-            "video": self.video, "camera_id": self.camera_id, "frames": self.frames, "fps": self.fps, "tracks": self.tracks, "seconds": self.seconds,
+            "video": self.video, "camera_id": self.camera_id, "first_frame": self.first_frame, "frames": self.frames, "fps": self.fps, "tracks": self.tracks,
+            "seconds": self.seconds,
             "rules": {
                 name: {"settings": r.settings, "verdicts": r.verdict_counts(), "findings": [f.as_json() for f in r.findings], "records": r.records}
                 for name, r in self.results.items()
@@ -65,4 +67,5 @@ def check_video(
     motion = motion_estimator.estimate(reader, log.by_frame if log else {}, start, end)
     observation = Observation(history.tracks, motion, reader.fps, reader.width, reader.height, start, end)
     results = {rule.name: rule.evaluate(observation) for rule in rules}
-    return CheckResult(reader.path.name, camera.camera_id, history.frames_seen, reader.fps, len(history.tracks), round(time.perf_counter() - began, 1), results)
+    seconds = round(time.perf_counter() - began, 1)
+    return CheckResult(reader.path.name, camera.camera_id, history.frames_seen, reader.fps, len(history.tracks), seconds, results, start)

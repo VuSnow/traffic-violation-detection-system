@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Any, TypeVar
 
@@ -73,3 +74,8 @@ def load_config(path: str | Path, model: type[M]) -> M:
         return validate(model, data)
     except ConfigError as error:
         raise ConfigError(f"{path}: {error}") from error
+
+
+def file_version(path: str | Path) -> str:
+    """A settings file's version, from its content: any change to the file changes it. Records keep it."""
+    return "sha256:" + hashlib.sha256(Path(path).read_bytes()).hexdigest()[:12]
