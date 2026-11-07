@@ -1,0 +1,13 @@
+# The settings of each rule, for every camera. A camera file can change any of them for one camera,
+# under "rules: <rule>: settings:". Changing a value means the scores of Notebooks 05, 05b and 09 no
+# longer apply: every result records the settings that produced it. The red-light rule joins in Task 11.
+
+wrong_way:
+  version: 1
+  window_seconds: 2.0           # how long a vehicle must move against the direction; chosen in Notebook 05
+  smoothing_seconds: 0.15
+  merge_gap_seconds: 0.25       # passing windows closer than this are one event
+  min_opposing_heights: 1.0     # C3: it must move at least this many box heights against the direction
+  min_top_edge_share: 0.25      # C4: the top edge must move at least this share of that distance
+  min_observed_fraction: 0.8    # C5: share of the window's frames in which the vehicle is seen
+  border_margin: 3              # px
