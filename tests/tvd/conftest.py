@@ -6,6 +6,7 @@ import pytest
 
 from tvd.detection import DETECTORS, BaseDetector
 from tvd.domain import Box, Detection, Frame, TrackedObject
+from tvd.signals import SIGNAL_READERS, BaseSignalReader
 from tvd.tracking import TRACKERS, BaseTracker
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +36,17 @@ class SameIdTracker(BaseTracker):
 
     def reset(self) -> None:
         self.resets += 1
+
+
+@SIGNAL_READERS.register("test-fixed-state")
+class FixedStateReader(BaseSignalReader):
+    """A signal head that always shows ``state``."""
+
+    def __init__(self, state: str = "red") -> None:
+        self.state = state
+
+    def read(self, image) -> str:
+        return self.state
 
 
 @pytest.fixture
