@@ -142,3 +142,24 @@ def finding_from_event(event: dict, points: tuple = ()):
     start = event.get("start_frame", points[0].frame_index if points else event["trigger_frame"])
     end = event.get("end_frame", points[-1].frame_index if points else event["trigger_frame"])
     return Finding(event["violation_type"], event["track_id"], event["class_name"], start, event["trigger_frame"], end, event["why"], evidence, points)
+
+
+NOTEBOOK_08_RLR = OUTPUTS / "08_end_to_end_baseline" / "rlr_occasions"
+
+
+def cut_losslessly(source: Path, start: int, end: int, path: Path) -> Path:
+    """Frames ``start`` to ``end`` (not included) of a video, in a file of their own that decodes to exactly the same pixels (FFV1)."""
+    import subprocess
+
+    from tvd.video import VideoReader, find_ffmpeg
+
+    with VideoReader(source) as reader:
+        size, fps = f"{reader.width}x{reader.height}", reader.fps
+        command = [find_ffmpeg(), "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", size, "-r", str(fps), "-i", "-", "-an", "-c:v", "ffv1", "-pix_fmt", "bgr0", str(path)]
+        encoder = subprocess.Popen(command, stdin=subprocess.PIPE)
+        for frame in reader.frames(start, end):
+            encoder.stdin.write(frame.image.tobytes())
+    encoder.stdin.close()
+    if encoder.wait() != 0:
+        raise RuntimeError(f"ffmpeg could not write {path}")
+    return path

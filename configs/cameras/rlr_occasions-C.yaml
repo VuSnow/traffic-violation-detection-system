@@ -1,0 +1,19 @@
+# Clip C of data/raw/rlr_occasions.mp4 (frames 914 to 1121), cut into its own file: a fixed camera at night.
+# The source is a compilation, so each of its clips is a camera of its own. From clip C of configs/scenes/rlr_occasions.json.
+camera_id: rlr_occasions-C
+frame_size: [1280, 720]
+rules:
+  red_light:
+    scene:
+      stop_line: [[190, 490], [420, 492], [664, 500], [936, 508], [1180, 522], [1280, 532]]
+      lane_dividers: [420, 664, 936, 1180]    # left of 420: the left-turn lane; right of 1180: the right-turn lane
+      lane_direction_deg: -24.0
+      traffic_direction: away_from_camera
+      evaluable_x_max: 1280
+      signals:
+        reader: glow                          # at night only the lamp's glow can be read
+        through:                              # mast heads 2 and 3
+          - {roi: [835, 80, 878, 150]}
+          - {roi: [985, 100, 1026, 170]}
+        left:                                 # mast head 1
+          - {roi: [650, 62, 685, 128]}
