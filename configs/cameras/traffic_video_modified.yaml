@@ -1,0 +1,29 @@
+# A night street with a signal graphic added to the image (data/traffic_video_modified.mp4, not in git).
+# It is a simulation: the graphic is treated as the real signal of the road. From configs/scenes/traffic_video_modified.json.
+camera_id: traffic_video_modified
+frame_size: [1920, 1012]
+motion:                       # the camera moves: positions are compared on frame 357
+  type: orb
+  options:
+    reference_frame: 357
+    excluded_areas:           # drawn over the image, so they do not move with the road
+      - [1742, 21, 1879, 309]   # the signal graphic
+      - [500, 410, 1420, 670]
+rules:
+  red_light:
+    scene:
+      stop_line: [[675, 841], [1045, 852], [1864, 888]]   # pixels of the reference frame
+      lane_dividers: [675, 1864]
+      lane_direction_deg: 169.0
+      traffic_direction: toward_camera
+      signal_source: simulated_overlay
+      signals:
+        reader: lamps
+        options: {half: 12}
+        through:
+          - {red: [1810, 79], yellow: [1810, 160], green: [1810, 239]}
+        left:
+          - {red: [1810, 79], yellow: [1810, 160], green: [1810, 239]}
+    settings:                 # vehicles come toward the camera: the box bottom is already the front,
+      entry_offset: 0.0       # and the image ends soon after the line
+      pass_margin: 0.2

@@ -1,0 +1,20 @@
+# A junction filmed from a hand-held camera (data/video-test.mp4). From configs/scenes/video-test.json.
+camera_id: video-test
+frame_size: [1920, 1080]
+motion:                       # the camera moves: positions are compared on frame 450
+  type: orb
+  options:
+    reference_frame: 450
+rules:
+  wrong_way:
+    scene:
+      vanishing_point: [930.2, 113.9]   # where the lanes meet; "away_from_camera" points at it
+      regions:                          # pixels of the reference frame
+        - id: left_carriageway
+          polygon: [[733, 247], [930, 250], [931, 380], [556, 369]]
+          allowed_direction: toward_camera
+          tolerance_deg: 60
+        - id: right_carriageway
+          polygon: [[934, 250], [1125, 254], [1535, 540], [937, 540]]
+          allowed_direction: away_from_camera
+          tolerance_deg: 60
