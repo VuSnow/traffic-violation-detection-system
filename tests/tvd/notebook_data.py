@@ -126,3 +126,19 @@ def clip_from_entry(entry: dict):
 def notebook_08_records() -> dict[str, dict]:
     """Notebook 08's records, by event id. They hold real plate numbers: never print them."""
     return {r["event_id"]: r for r in load_json(NOTEBOOK_08 / "events" / "traffic_video_modified_review_events.json")["events"]}
+
+
+NOTEBOOK_07_REVERSED = OUTPUTS / "07_violation_event_generation" / "wrong_way_control" / "video-test-reversed_review_events.json"
+REVERSED_CANDIDATES = OUTPUTS / "05_violation_detection" / "time_reversed_control" / "video-test-reversed_events.json"
+
+
+def finding_from_event(event: dict, points: tuple = ()):
+    """A finding saying what a notebook's candidate event says. A red-light event has no start or end: its points give them."""
+    from tvd.rules import Finding
+
+    evidence = {**({"region_id": event["region_id"]} if "region_id" in event else {}), **event["evidence"]}
+    if event.get("signal_source"):
+        evidence["signal_source"] = event["signal_source"]
+    start = event.get("start_frame", points[0].frame_index if points else event["trigger_frame"])
+    end = event.get("end_frame", points[-1].frame_index if points else event["trigger_frame"])
+    return Finding(event["violation_type"], event["track_id"], event["class_name"], start, event["trigger_frame"], end, event["why"], evidence, points)

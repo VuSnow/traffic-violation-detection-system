@@ -4,7 +4,28 @@ The record of one candidate violation, from Notebook 07. Code: `src/traffic_viol
 
 A record is a **candidate**. It starts `pending`, and only a reviewer's decision changes that. Nothing in the pipeline confirms a violation by itself.
 
+## Version 2: the review service
+
+The review service (`src/tvd/records.py`) writes version 2. It keeps every field of version 1 below, with the same meaning, and changes these:
+
+| Field | Version 2 |
+| --- | --- |
+| `schema_version` | 2 |
+| `event_id` | `evt-<video_id>-<rule>-f<trigger frame>-t<track id>`, for both rules |
+| `camera_id` | New: the camera file the video was checked with |
+| `video` | Adds `recorded_at`: the time of the video's first frame, as the backend sent it, in ISO 8601 with its time zone |
+| `track` | `tracking_session` is `<video_id>/<tracker>`. There is no `clip`: a camera file describes the whole video |
+| `time` | Adds `start_at`, `trigger_at` and `end_at`: `recorded_at` plus the seconds into the video, to the millisecond, in the same time zone. Red-light records now have a start and an end too: the first and last frames of the vehicle's track |
+| `rule` | Only `name` and `version`. All the rule's settings are in `settings.rule` |
+| `evidence` | Paths are relative to the folder of `records.json`: `clips/`, `evidence/` and `plates/`. Adds `clip_frames`: the clip's first frame and one past its last, in the video |
+| `settings` | New: the effective settings that produced the record, as `perception`, `rule`, `plates` and `evidence` |
+| `config_files` | New: the version of each settings file, as `sha256:` and the first 12 hex digits of its hash |
+| `review` | Always `pending`, with no reviewer: the service never decides. Review happens in the backend |
+
+The file is `{"schema_version": 2, "events": [...]}`.
+
 ## Candidate record
+
 
 | Field | Type | Meaning |
 | --- | --- | --- |
