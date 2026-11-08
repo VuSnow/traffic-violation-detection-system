@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, field_validator
 
@@ -35,6 +36,13 @@ class JobSettings(StrictModel):
         return self.deadline_minutes * 60 / self.seconds_per_video_second[motion_type]
 
 
+class LoggingSettings(StrictModel):
+    folder: Path
+    level: Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+    max_mb: float = Field(gt=0)
+    keep_files: int = Field(ge=1)
+
+
 class ServerSettings(StrictModel):
     host: str
     port: int = Field(ge=1, le=65535)
@@ -52,6 +60,7 @@ class ServiceSettings(StrictModel):
     version: int
     storage: StorageSettings
     jobs: JobSettings
+    logging: LoggingSettings
     server: ServerSettings
     files: SettingsFiles
 
