@@ -5,6 +5,7 @@ storage:
   folder: outputs/service       # each job gets <folder>/<job id>/; outputs/ is not in git
   keep_days: 7                  # a finished job's folder and record are deleted after this
   max_upload_mb: 4096           # a larger upload is refused while it arrives
+  min_free_gb: 10               # less free space than this, and the health check says the service is failing
 jobs:
   deadline_minutes: 120         # results within 2 hours of upload, including the wait in the queue
   seconds_per_video_second:     # work per second of video, by the camera's motion type: measured on ai_server_2 for

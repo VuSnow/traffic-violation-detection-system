@@ -14,6 +14,7 @@ class StorageSettings(StrictModel):
     folder: Path
     keep_days: float = Field(gt=0)
     max_upload_mb: int = Field(gt=0)
+    min_free_gb: float = Field(ge=0)
 
 
 class JobSettings(StrictModel):

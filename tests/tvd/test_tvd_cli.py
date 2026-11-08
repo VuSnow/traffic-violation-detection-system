@@ -184,6 +184,17 @@ def test_serve_checks_everything_then_listens_where_the_settings_say(tmp_path, m
     monkeypatch.setattr(uvicorn, "run", lambda app, host, port: started.update(app=app, host=host, port=port))
     assert main(["serve", "--config", str(service_files(tmp_path))]) == 0
     assert (started["host"], started["port"]) == ("127.0.0.1", 8040) and isinstance(started["app"], FastAPI)
+    import json
+    import logging
+
+    from tvd.service.logs import LOGGER
+
+    for handler in list(logging.getLogger(LOGGER).handlers):  # So that later tests are not logged in this test's folder.
+        logging.getLogger(LOGGER).removeHandler(handler)
+        handler.close()
+    logging.getLogger(LOGGER).propagate = True
+    started_line = json.loads((tmp_path / "storage" / "logs" / "service.log").read_text().splitlines()[-1])
+    assert started_line["event"] == "service_started" and started_line["port"] == 8040 and started_line["models"]["tracker"] == {"type": "test-same-id"}
 
 
 def test_serve_refuses_a_broken_camera_file_before_it_listens(tmp_path, capsys, monkeypatch):

@@ -7,6 +7,7 @@
 | GET | /jobs/{job_id}/records | records.json once the job is done; 409 before |
 | GET | /jobs/{job_id}/files/{path} | one file of the job's folder |
 | GET | /cameras | the configured cameras and their rules |
+| GET | /health | ok or degraded (200), or failing (503), with the problems, the queue, the free space and the models |
 """
 
 from __future__ import annotations
@@ -80,5 +81,10 @@ def create_app(service: ReviewService, run_worker: bool = True) -> FastAPI:
     @app.get("/cameras")
     def cameras() -> list[dict[str, Any]]:
         return service.describe_cameras()
+
+    @app.get("/health")
+    def health() -> JSONResponse:
+        report = service.health(worker is not None and worker.running)
+        return JSONResponse(status_code=503 if report["status"] == "failing" else 200, content=report)
 
     return app

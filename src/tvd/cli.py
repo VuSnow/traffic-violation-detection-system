@@ -155,12 +155,13 @@ def run_serve(config_path: Path) -> None:
 
     from tvd.service.api import create_app
     from tvd.service.core import ReviewService
+    from tvd.service.logs import log_event, setup_logging
     from tvd.service.settings import load_service_settings
 
     settings = load_service_settings(config_path)
+    setup_logging(settings.logging)  # Before the service starts, so that the jobs it marks failed are logged.
     service = ReviewService(settings)
-    for job_id in service.interrupted:
-        print(f"job {job_id} was running when the service stopped: it is marked failed", file=sys.stderr)
+    log_event("service_started", host=settings.server.host, port=settings.server.port, models=service.pipeline.models())
     uvicorn.run(create_app(service), host=settings.server.host, port=settings.server.port)
 
 

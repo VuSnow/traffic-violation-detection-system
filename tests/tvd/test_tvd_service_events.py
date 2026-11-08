@@ -5,9 +5,11 @@ from datetime import timedelta
 
 import pytest
 from service_data import PLATES, settings_for
-from test_tvd_runner import OneUse  # noqa: F401  Registers "test-one-use-plate".
+from conftest import FakePlateModels
+from test_tvd_runner import NeverStarts, OneUse  # noqa: F401  Registers "test-never-starts" and "test-one-use-plate".
 from test_tvd_service import Clock, start, submit
 
+from tvd.plates import PLATE_MODELS
 from tvd.service.core import ReviewService
 from tvd.service.intake import Refused
 from tvd.service.logs import LOGGER
@@ -90,3 +92,43 @@ def test_a_worker_error_is_logged(events):
     finally:
         worker.stop(timeout=5)
     assert ("worker_error", {"error": "RuntimeError: database is locked"}) in events()
+
+
+@PLATE_MODELS.register("test-cpu-plate")
+class OnTheCpu(FakePlateModels):
+    """Models that had to start on the CPU, as when the GPU is full."""
+
+    def describe(self):
+        return {"type": "onnx_worker", "providers": ["CPUExecutionProvider"]}
+
+
+def health_of(tmp_path, plates=PLATES, worker_running=True, **storage):
+    settings = settings_for(tmp_path, plates)
+    if storage:
+        settings = settings.model_copy(update={"storage": settings.storage.model_copy(update=storage)})
+    return ReviewService(settings, Clock()).health(worker_running)
+
+
+def test_a_service_with_its_worker_and_room_is_healthy(tmp_path):
+    report = health_of(tmp_path)
+    assert (report["status"], report["problems"], report["worker_running"], report["queue"]) == ("ok", [], True, {"jobs": 0, "seconds": 0.0})
+    assert report["started_at"] == "2026-11-07T01:00:00+00:00" and report["storage"]["free_gb"] > 0
+    assert report["models"]["plates"] == {"type": "FakePlateModels"} and report["models"]["software"]["numpy"] == "2.4.6"
+
+
+@pytest.mark.parametrize("change, problem", [
+    ({"worker_running": False}, "the worker is not running: no job will be done"),
+    ({"min_free_gb": 10**9}, "GB free in the storage, under the 1000000000.0 GB it needs"),
+])
+def test_a_service_that_cannot_do_jobs_is_failing(tmp_path, change, problem):
+    report = health_of(tmp_path, **change)
+    assert report["status"] == "failing" and any(problem in p for p in report["problems"])
+
+
+@pytest.mark.parametrize("plates, problem", [
+    (PLATES.replace("type: test-plate", "type: test-cpu-plate"), "the plate models run on the CPU: the GPU may be full"),
+    (PLATES.replace("type: test-plate", "type: test-never-starts"), "no plates are read: the plate models did not start: Plate models: no such model"),
+])
+def test_a_service_that_does_jobs_less_well_is_degraded(tmp_path, plates, problem):
+    report = health_of(tmp_path, plates)
+    assert report["status"] == "degraded" and report["problems"] == [problem]

@@ -82,3 +82,14 @@ def test_with_its_worker_the_app_runs_each_upload_to_its_records(service, sample
         while client.get(f"/jobs/{job_id}").json()["state"] in ("queued", "running") and time.monotonic() < end:
             time.sleep(0.2)
         assert client.get(f"/jobs/{job_id}").json()["state"] == "done" and len(client.get(f"/jobs/{job_id}/records").json()["events"]) == 2
+
+
+def test_health_is_failing_without_a_worker(client):
+    response = client.get("/health")
+    assert response.status_code == 503 and response.json()["problems"] == ["the worker is not running: no job will be done"]
+
+
+def test_health_is_ok_while_the_app_runs_its_worker(service):
+    with TestClient(create_app(service)) as client:
+        response = client.get("/health")
+    assert response.status_code == 200 and response.json()["status"] == "ok"

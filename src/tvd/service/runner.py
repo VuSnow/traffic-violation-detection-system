@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from tvd.camera import load_rule_defaults
 from tvd.check import check_video
@@ -61,6 +62,12 @@ class Pipeline:
                 log_event("plate_models_restarted", logging.WARNING)
             self._start_plate_models()
         return self._plate_models
+
+    def models(self) -> dict[str, Any]:
+        """The models as they are now, for the health check. Plate models that stopped are reported, not started again."""
+        alive = self._plate_models is not None and self._plate_models.is_alive()
+        unavailable = self.plates_unavailable if self._plate_models is None else "the plate models stopped; they start again with the next job"
+        return models_used(self.detector, self.perception.tracker, self._plate_models if alive else None, unavailable)
 
     def run(self, job: Job, camera: Camera, folder: Path, report: Report) -> ReviewResult:
         """Review the job's video, which is in ``folder``, and write the review there."""

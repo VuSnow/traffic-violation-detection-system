@@ -10,6 +10,7 @@ import fcntl
 import json
 import logging
 import re
+import shutil
 import threading
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -67,6 +68,7 @@ class ReviewService:
         self.store = JobStore(self.folders.database)
         self.pipeline = pipeline if pipeline is not None else Pipeline(settings.files)
         self._admission = threading.Lock()  # Two uploads at once must not both fit in the same room in the queue.
+        self.started_at = as_text(clock())
         self.interrupted = self.store.interrupt(as_text(clock()))
         for job_id in self.interrupted:
             log_event("job_interrupted", logging.WARNING, job_id=job_id)
@@ -147,6 +149,33 @@ class ReviewService:
         if found is None:
             raise NotFound(f"No file {path} in job {job_id}")
         return found
+
+    def health(self, worker_running: bool) -> dict[str, Any]:
+        """``ok``, ``degraded`` or ``failing``, with the problems found, for a person and for Docker's health check.
+
+        ``failing``: no job can be done, because no worker runs or the storage is almost full.
+        ``degraded``: jobs are done, but slowly or without plates, as when the GPU is full.
+        """
+        failing, degraded = [], []
+        free_gb = shutil.disk_usage(self.folders.root).free / 2**30
+        if not worker_running:
+            failing.append("the worker is not running: no job will be done")
+        if free_gb < self.settings.storage.min_free_gb:
+            failing.append(f"{free_gb:.1f} GB free in the storage, under the {self.settings.storage.min_free_gb:.1f} GB it needs")
+        models = self.pipeline.models()
+        if models["detector"].get("device") == "cpu":
+            degraded.append("the detector runs on the CPU: jobs take much longer")
+        plates = models["plates"]
+        if "unavailable" in plates:
+            degraded.append(f"no plates are read: {plates['unavailable']}")
+        elif plates.get("providers", ["CUDAExecutionProvider"])[0] != "CUDAExecutionProvider":
+            degraded.append("the plate models run on the CPU: the GPU may be full")
+        waiting = self.store.waiting()
+        return {
+            "status": "failing" if failing else "degraded" if degraded else "ok", "problems": failing + degraded,
+            "worker_running": worker_running, "queue": {"jobs": len(waiting), "seconds": round(self.queue_seconds(), 1)},
+            "storage": {"free_gb": round(free_gb, 1)}, "models": models, "started_at": self.started_at,
+        }
 
     def describe_cameras(self) -> list[dict[str, Any]]:
         return self.cameras.describe()

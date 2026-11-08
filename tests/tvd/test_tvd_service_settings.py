@@ -10,7 +10,7 @@ SERVICE = ROOT / "configs" / "service.yaml"
 def test_the_service_file_is_read():
     settings = load_service_settings(SERVICE)
     assert (settings.server.host, settings.server.port, settings.jobs.deadline_minutes) == ("127.0.0.1", 8040, 120)
-    assert settings.files.cameras.as_posix() == "configs/cameras" and settings.storage.keep_days == 7
+    assert settings.files.cameras.as_posix() == "configs/cameras" and settings.storage.keep_days == 7 and settings.storage.min_free_gb == 10
 
 
 def test_the_longest_video_follows_the_measured_speed():
