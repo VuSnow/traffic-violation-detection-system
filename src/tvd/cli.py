@@ -72,6 +72,7 @@ def run_check(video: Path, camera_path: Path, output: Path, perception_path: Pat
     motion_estimator = build_motion_estimator(camera.motion)
     with VideoReader(video) as reader:
         check_frame_size(reader, camera)
+        motion_estimator.check_frames(reader.frame_count)
         detector = build_detector(perception.detector)
         tracker = build_tracker(perception.tracker)
         result = check_video(reader, camera, detector, tracker, set(perception.track_classes), motion_estimator, rules)
@@ -108,6 +109,7 @@ def run_review(
     config_files = {name: file_version(path) for name, path in files.items()}
     with VideoReader(video) as reader:
         check_frame_size(reader, camera)
+        motion_estimator.check_frames(reader.frame_count)
         prepare_folder(output)
         try:
             plate_models, unavailable = build_plate_models(plates.models), ""

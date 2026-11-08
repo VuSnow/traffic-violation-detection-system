@@ -75,5 +75,8 @@ class BaseMotionEstimator(ABC):
     def estimate(self, reader: VideoReader, detections: dict[int, list[Detection]], start: int, stop: int) -> CameraMotion:
         """The motion of frames ``start`` to ``stop`` (not included)."""
 
+    def check_frames(self, frame_count: int) -> None:
+        """Raise ``ValueError`` if a video of ``frame_count`` frames cannot be used, before any work. Any length can, by default."""
+
 
 MOTION_ESTIMATORS: Registry[BaseMotionEstimator] = Registry("camera motion estimator")

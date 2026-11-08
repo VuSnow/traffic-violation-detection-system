@@ -38,6 +38,13 @@ def test_the_reference_frame_must_be_analysed(sample_video):
         OrbMotionEstimator(reference_frame=50).estimate(reader, {}, 0, 10)
 
 
+def test_a_video_too_short_for_the_reference_frame_is_refused_before_any_work():
+    with pytest.raises(ValueError, match="The camera's reference frame 240 is beyond the video's 240 frames"):
+        OrbMotionEstimator(reference_frame=240).check_frames(240)
+    OrbMotionEstimator(reference_frame=240).check_frames(241)
+    MOTION_ESTIMATORS.create("fixed").check_frames(1)
+
+
 def test_the_mask_hides_moving_objects_and_drawn_areas_only():
     mask = OrbMotionEstimator(reference_frame=0, excluded_areas=[[0, 0, 5, 5]], mask_margin=2).static_mask((360, 640), detections_at(0))
     assert mask[0, 0] == 0 and mask[100, 98] == 0 and mask[100, 97] == 255  # Excluded area; a car's box plus its 2 px margin.

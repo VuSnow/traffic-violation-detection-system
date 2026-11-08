@@ -60,6 +60,10 @@ class OrbMotionEstimator(BaseMotionEstimator):
         finally:
             cv2.setNumThreads(previous_threads)
 
+    def check_frames(self, frame_count: int) -> None:
+        if not 0 <= self.reference_frame < frame_count:
+            raise ValueError(f"The camera's reference frame {self.reference_frame} is beyond the video's {frame_count} frames")
+
     def static_mask(self, shape: tuple[int, int], detections: list[Detection]) -> np.ndarray:
         """255 where keypoints may be used: everywhere but the excluded areas and the moving objects."""
         mask = np.full(shape, 255, np.uint8)

@@ -63,6 +63,14 @@ def test_check_writes_the_findings_and_prints_a_summary(tmp_path, capsys, sample
     assert json.loads(output.read_text())["rules"]["red_light"]["findings"][0]["trigger_frame"] == 70
 
 
+def test_check_refuses_a_reference_frame_beyond_the_video_before_any_work(tmp_path, capsys, sample_video):
+    (tmp_path / "camera.yaml").write_text(CAMERA_FILE.replace("frame_size: [640, 360]", "frame_size: [640, 360]\nmotion: {type: orb, options: {reference_frame: 500}}"))
+    (tmp_path / "perception.yaml").write_text(DOWN)
+    argv = ["check", "--video", str(sample_video), "--camera", str(tmp_path / "camera.yaml"), "--output", str(tmp_path / "f.json"), "--perception", str(tmp_path / "perception.yaml")]
+    assert main(argv) == 2
+    assert "error: The camera's reference frame 500 is beyond the video's 240 frames" in capsys.readouterr().err and not (tmp_path / "f.json").exists()
+
+
 def test_check_refuses_a_video_of_another_camera(tmp_path, capsys, sample_video):
     (tmp_path / "camera.yaml").write_text(CAMERA_FILE.replace("[640, 360]", "[1280, 720]"))
     argv = ["check", "--video", str(sample_video), "--camera", str(tmp_path / "camera.yaml"), "--output", str(tmp_path / "f.json")]
