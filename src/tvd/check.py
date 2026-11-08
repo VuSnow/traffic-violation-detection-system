@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,7 +11,7 @@ from tvd.camera import CameraConfig
 from tvd.config import ConfigError
 from tvd.detection import BaseDetector
 from tvd.motion import BaseMotionEstimator
-from tvd.observers import DetectionLog
+from tvd.observers import DetectionLog, FrameObserver
 from tvd.perception import track_video
 from tvd.rules import BaseRule, Observation, RuleResult
 from tvd.tracking import BaseTracker
@@ -56,13 +57,17 @@ def check_video(
     rules: list[BaseRule],
     start: int = 0,
     stop: int | None = None,
+    observers: Sequence[FrameObserver] = (),
 ) -> CheckResult:
-    """Detect and track once, and give every rule the same tracks. Build new rules for each video: their observers keep what they saw."""
+    """Detect and track once, and give every rule the same tracks. Build new rules for each video: their observers keep what they saw.
+
+    ``observers`` see every frame too, as the rules' own do: a job's progress, for example.
+    """
     check_frame_size(reader, camera)
     began = time.perf_counter()
     log = DetectionLog() if motion_estimator.needs_detections else None
-    observers = [o for rule in rules for o in rule.frame_observers()] + ([log] if log else [])
-    history = track_video(reader, detector, tracker, track_classes, start, stop, observers)
+    everyone = [o for rule in rules for o in rule.frame_observers()] + ([log] if log else []) + list(observers)
+    history = track_video(reader, detector, tracker, track_classes, start, stop, everyone)
     end = start + history.frames_seen
     motion = motion_estimator.estimate(reader, log.by_frame if log else {}, start, end)
     observation = Observation(history.tracks, motion, reader.fps, reader.width, reader.height, start, end)

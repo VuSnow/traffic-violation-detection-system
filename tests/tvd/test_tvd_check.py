@@ -88,3 +88,16 @@ def test_the_json_leaves_out_the_points_of_each_finding(sample_video):
 def test_the_first_frame_analysed_is_kept(sample_video):
     result = run(sample_video, start=100)
     assert (result.first_frame, result.frames, result.as_json()["first_frame"]) == (100, 140, 100)
+
+
+def test_more_observers_see_every_frame_of_the_pass(sample_video):
+    from tvd.observers import FrameCounter
+
+    reported = []
+    config = CameraConfig.model_validate(CAMERA)
+    with VideoReader(sample_video) as reader:
+        check_video(
+            reader, config, build_detector(ComponentConfig(type="test-moving-car", options={"step": 0, "step_y": 1})), build_tracker(ComponentConfig(type="test-same-id")),
+            {"car"}, build_motion_estimator(config.motion), build_rules(config, DEFAULTS), 40, observers=[FrameCounter(reported.append, every=50, total=200)],
+        )
+    assert reported == [50, 100, 150, 200]

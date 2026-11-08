@@ -4,7 +4,7 @@ import pytest
 from conftest import ROOT
 
 from tvd.detection import DETECTORS
-from tvd.observers import DetectionLog, FrameObserver
+from tvd.observers import DetectionLog, FrameCounter, FrameObserver
 from tvd.perception import track_video
 from tvd.tracking import TRACKERS
 from tvd.video import VideoReader
@@ -64,3 +64,11 @@ def test_the_same_tracks_as_the_notebooks(monkeypatch):
         for point in track.points:
             found[point.frame_index].append((track.track_id, point.box.as_list()))
     assert {frame: sorted(items) for frame, items in found.items()} == expected
+
+
+def test_a_frame_counter_reports_every_n_frames_and_the_last(sample_video):
+    reported = []
+    counter = FrameCounter(reported.append, every=100, total=240)
+    with VideoReader(sample_video) as reader:
+        track_video(reader, DETECTORS.create("test-moving-car"), TRACKERS.create("test-same-id"), {"car"}, observers=[counter])
+    assert reported == [100, 200, 240] and counter.count == 240
