@@ -1,0 +1,10 @@
+# Only what the image needs is sent to Docker: never data, outputs, notebooks or the private labels.
+*
+!docker/
+!src/
+!configs/
+!pyproject.toml
+!README.md
+!weights/yolo26m.pt
+**/__pycache__
+**/*.egg-info
