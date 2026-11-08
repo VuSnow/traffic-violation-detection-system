@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from tvd.records import RecordContext, parse_recorded_at
 from tvd.review import ReviewResult, review_check
 from tvd.service.cameras import Camera
 from tvd.service.jobs import Job
+from tvd.service.logs import log_event
 from tvd.service.settings import SettingsFiles
 from tvd.versions import models_used
 from tvd.video import VideoReader
@@ -49,12 +51,14 @@ class Pipeline:
             self._plate_models = build_plate_models(self.plates.models)
         except RuntimeError as error:  # The review goes on without plates, and its records say why.
             self._plate_models, self.plates_unavailable = None, f"the plate models did not start: {error}"
+            log_event("plate_models_unavailable", logging.WARNING, reason=self.plates_unavailable)
 
     def plate_models(self) -> BasePlateModels | None:
         """The plate models, started again if they are gone, as after a call that did not answer in time."""
         if self._plate_models is None or not self._plate_models.is_alive():
             if self._plate_models is not None:
                 self._plate_models.close()
+                log_event("plate_models_restarted", logging.WARNING)
             self._start_plate_models()
         return self._plate_models
 

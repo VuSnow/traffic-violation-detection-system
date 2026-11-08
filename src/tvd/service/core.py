@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import logging
 import re
 import threading
 from collections.abc import Callable
@@ -20,6 +21,7 @@ from tvd.records import parse_recorded_at
 from tvd.service.cameras import CameraCatalog
 from tvd.service.intake import Refused, estimate_seconds, inspect_video, save_upload
 from tvd.service.jobs import DONE, RUNNING, Job, JobStore
+from tvd.service.logs import log_event
 from tvd.service.runner import Pipeline
 from tvd.service.settings import ServiceSettings
 from tvd.service.storage import JobFolders
@@ -66,10 +68,24 @@ class ReviewService:
         self.pipeline = pipeline if pipeline is not None else Pipeline(settings.files)
         self._admission = threading.Lock()  # Two uploads at once must not both fit in the same room in the queue.
         self.interrupted = self.store.interrupt(as_text(clock()))
+        for job_id in self.interrupted:
+            log_event("job_interrupted", logging.WARNING, job_id=job_id)
         self.remove_old()
 
     def submit(self, upload: BinaryIO, filename: str, camera_id: str, recorded_at: str) -> Job:
         """Save, check and queue an upload. ``Refused`` says why it was not queued; then nothing of it is kept."""
+        try:
+            job, waiting = self._admit(upload, filename, camera_id, recorded_at)
+        except Refused as refused:
+            log_event("upload_refused", logging.WARNING, camera_id=camera_id, status=refused.status, reason=refused.reason)
+            raise
+        log_event(
+            "job_queued", job_id=job.job_id, camera_id=camera_id, video_seconds=job.video_seconds,
+            estimate_seconds=job.estimate_seconds, queue_seconds=round(waiting, 1),
+        )
+        return job
+
+    def _admit(self, upload: BinaryIO, filename: str, camera_id: str, recorded_at: str) -> tuple[Job, float]:
         try:
             parse_recorded_at(recorded_at)
         except ValueError as error:
@@ -98,7 +114,7 @@ class ReviewService:
         except BaseException:
             self.folders.remove(job_id)
             raise
-        return job
+        return job, waiting
 
     def queue_seconds(self) -> float:
         """How long the jobs now waiting should take, from their estimates: for the running one, what is left of it."""
@@ -141,6 +157,9 @@ class ReviewService:
         if job is None:
             return None
         self.store.start(job.job_id, as_text(self.clock()))
+        log_event("job_started", job_id=job.job_id)
+        began = self.clock()
+        stages: list[str] = []
         try:
             camera = self.cameras.get(job.camera_id)
             if camera is None:
@@ -148,12 +167,22 @@ class ReviewService:
 
             def report(stage: str, done: int, total: int) -> None:
                 self.store.progress(job.job_id, stage, done, total)
+                if not stages or stages[-1] != stage:
+                    stages.append(stage)
+                    log_event("job_stage", job_id=job.job_id, stage=stage)
 
-            self.pipeline.run(job, camera, self.folders.folder(job.job_id), report)
+            result = self.pipeline.run(job, camera, self.folders.folder(job.job_id), report)
         except Exception as error:
-            self.store.fail(job.job_id, f"{type(error).__name__}: {error}", as_text(self.clock()))
+            reason = f"{type(error).__name__}: {error}"
+            self.store.fail(job.job_id, reason, as_text(self.clock()))
+            log_event("job_failed", logging.ERROR, exc_info=True, job_id=job.job_id, reason=reason)
         else:
             self.store.finish(job.job_id, as_text(self.clock()))
+            summary = result.summary()
+            log_event(
+                "job_done", job_id=job.job_id, records=summary["records"], plates=summary["plates"], failures=summary["failures"],
+                seconds=round((self.clock() - began).total_seconds(), 1), estimate_seconds=job.estimate_seconds,
+            )
         return self.store.get(job.job_id)
 
     def remove_old(self) -> list[str]:
@@ -163,6 +192,7 @@ class ReviewService:
         for job_id in old:
             self.folders.remove(job_id)
             self.store.delete(job_id)
+            log_event("job_removed", job_id=job_id)
         return old
 
     def close(self) -> None:

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import threading
 
 from tvd.service.core import ReviewService
+from tvd.service.logs import log_event
 
 
 class Worker:
@@ -40,6 +42,7 @@ class Worker:
                     self.service.remove_old()
             except Exception as error:  # A job's own failure is kept by run_next: this is anything else, such as a locked database.
                 self.errors.append(f"{type(error).__name__}: {error}")
+                log_event("worker_error", logging.ERROR, exc_info=True, error=self.errors[-1])
                 job = None
             if job is None:
                 self._stop.wait(self.idle_seconds)

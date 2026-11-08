@@ -26,7 +26,7 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname, "event": record.getMessage(), **getattr(record, "fields", {}),
         }
         if record.exc_info:
-            line["error"] = self.formatException(record.exc_info)
+            line["traceback"] = self.formatException(record.exc_info)  # Its own key: an event may have an "error" field.
         return json.dumps(line, default=str)
 
 

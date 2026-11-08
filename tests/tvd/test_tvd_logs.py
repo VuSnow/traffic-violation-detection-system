@@ -55,7 +55,17 @@ def test_an_error_keeps_its_traceback(tmp_path):
     except RuntimeError:
         log_event("job_failed", logging.ERROR, job_id="x", exc_info=True)
     (line,) = lines(path)
-    assert line["level"] == "ERROR" and "RuntimeError: ffmpeg failed" in line["error"] and "Traceback" in line["error"]
+    assert line["level"] == "ERROR" and "RuntimeError: ffmpeg failed" in line["traceback"] and "Traceback" in line["traceback"]
+
+
+def test_an_error_field_and_a_traceback_are_both_kept(tmp_path):
+    path = setup_logging(LoggingSettings(folder=tmp_path, level="INFO", max_mb=1, keep_files=2))
+    try:
+        raise RuntimeError("database is locked")
+    except RuntimeError:
+        log_event("worker_error", logging.ERROR, exc_info=True, error="RuntimeError: database is locked")
+    (line,) = lines(path)
+    assert line["error"] == "RuntimeError: database is locked" and "Traceback" in line["traceback"]
 
 
 def test_events_below_the_level_are_left_out(tmp_path):
