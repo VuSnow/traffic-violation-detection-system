@@ -43,7 +43,7 @@ rules:
 
 def service_files(tmp_path: Path, plates: str = PLATES) -> Path:
     """A service.yaml for tests, in tmp_path, with its own storage, cameras, perception and plate files."""
-    (tmp_path / "cameras").mkdir()
+    (tmp_path / "cameras").mkdir(exist_ok=True)
     (tmp_path / "cameras" / "test-camera.yaml").write_text(CAMERA)
     (tmp_path / "perception.yaml").write_text(PERCEPTION)
     (tmp_path / "plates.yaml").write_text(plates)
