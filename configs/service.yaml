@@ -1,0 +1,21 @@
+# The review service: where it keeps jobs, how long a video may be, and where it listens.
+# Paths are relative to the folder the service is started from: the project folder.
+version: 1
+storage:
+  folder: outputs/service       # each job gets <folder>/<job id>/; outputs/ is not in git
+  keep_days: 7                  # a finished job's folder and record are deleted after this
+  max_upload_mb: 4096           # a larger upload is refused while it arrives
+jobs:
+  deadline_minutes: 120         # results within 2 hours of upload, including the wait in the queue
+  seconds_per_video_second:     # work per second of video, by the camera's motion type: measured on ai_server_2 for
+    fixed: 2.2                  #   Part 4 (1080p, 38.7 s for 27.2 s of video), times 1.5 for margin: about 55 min at most
+    orb: 7.0                    #   (camera motion, 127.3 s for 27.2 s), times 1.5: about 17 min at most
+server:
+  host: 127.0.0.1               # only this machine; 0.0.0.0 opens it to the network, with no authentication
+  port: 8040                    # 8000 is taken on ai_server_2
+files:
+  cameras: configs/cameras      # one <camera id>.yaml per camera
+  perception: configs/tvd/perception.yaml
+  rules: configs/tvd/rules.yaml
+  plates: configs/tvd/plates.yaml
+  evidence: configs/tvd/evidence.yaml
