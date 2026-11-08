@@ -54,6 +54,11 @@ def test_only_what_the_image_needs_is_sent_to_docker():
     assert not [r for r in rules if r.startswith("!") and r.split("/")[0].lstrip("!") in ("data", "outputs", "notebooks")]
 
 
+def test_the_image_has_the_cuda_library_onnx_runtime_takes_from_the_server_s_own_cuda():
+    # Without cuRAND the plate models fall back to the CPU, and the health check says "degraded".
+    assert "pip install --no-deps nvidia-curand==10.4.2.66" in (DOCKER / "Dockerfile").read_text()
+
+
 def test_the_image_runs_as_the_storage_s_owner_and_checks_its_own_health():
     dockerfile = (DOCKER / "Dockerfile").read_text()
     assert "FROM python:3.11.18-slim-bookworm" in dockerfile and "pip install --no-deps boxmot==26.0.0" in dockerfile

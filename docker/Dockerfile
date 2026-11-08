@@ -19,6 +19,10 @@ RUN mkdir -p src/tvd src/traffic_violation_detection \
  && pip install --extra-index-url https://download.pytorch.org/whl/cu132 -c docker/constraints.txt ".[detection,tracking,plates,service]" \
  && pip install --no-deps boxmot==26.0.0
 
+# ONNX Runtime's CUDA provider needs cuRAND. On the server it finds the one of the system's CUDA 12.4; the image has no
+# system CUDA, so it gets the cuRAND of CUDA 13.2 from pip, as PyTorch gets its own CUDA libraries.
+RUN pip install --no-deps nvidia-curand==10.4.2.66
+
 # The models the tests used, inside the image: it runs the same models wherever it runs, and never downloads them.
 # scripts/deploy.sh build copies the plate models from the server's cache to docker/models first.
 COPY weights/yolo26m.pt weights/yolo26m.pt
