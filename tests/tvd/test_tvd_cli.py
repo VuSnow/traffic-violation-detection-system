@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from conftest import ROOT
 from notebook_data import NOTEBOOK_08_RLR, RED_LIGHT_SCENE, RLR_VIDEO, cut_losslessly, load_json
+from service_data import service_files
 
 from tvd.cli import main
 from tvd.plates import PLATE_MODELS, BasePlateModels
@@ -172,3 +173,24 @@ def test_review_reproduces_notebook_08_on_clip_c_cut_into_its_own_file(tmp_path,
     assert same and len(ours) == 2
     clips = NOTEBOOK_08_RLR / "violations" / "rlr_occasions_violation_clips"
     assert all((tmp_path / "job" / o["evidence"]["clip"]).read_bytes() == (clips / Path(t["evidence"]["clip"]).name).read_bytes() for o, t in zip(ours, theirs))
+
+
+def test_serve_checks_everything_then_listens_where_the_settings_say(tmp_path, monkeypatch):
+    import uvicorn
+    from fastapi import FastAPI
+
+    started = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, host, port: started.update(app=app, host=host, port=port))
+    assert main(["serve", "--config", str(service_files(tmp_path))]) == 0
+    assert (started["host"], started["port"]) == ("127.0.0.1", 8040) and isinstance(started["app"], FastAPI)
+
+
+def test_serve_refuses_a_broken_camera_file_before_it_listens(tmp_path, capsys, monkeypatch):
+    import uvicorn
+
+    monkeypatch.setattr(uvicorn, "run", lambda *args, **kwargs: pytest.fail("the service must not start"))
+    config = service_files(tmp_path)
+    camera = tmp_path / "cameras" / "test-camera.yaml"
+    camera.write_text(camera.read_text().replace("pass_margin", "pass_margn"))
+    assert main(["serve", "--config", str(config)]) == 2
+    assert "test-camera.yaml: rules.red_light:" in capsys.readouterr().err

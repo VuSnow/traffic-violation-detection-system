@@ -4,6 +4,7 @@
 - ``python -m tvd.cli check --video <file> --camera <yaml> --output <json>``: apply the camera's rules.
 - ``python -m tvd.cli review --video <file> --camera <yaml> --recorded-at <time> --output <folder>``: and write
   each candidate's evidence and record, for a person to review.
+- ``python -m tvd.cli serve [--config configs/service.yaml]``: the review service, with its REST API.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ PERCEPTION = Path("configs/tvd/perception.yaml")
 RULE_DEFAULTS = Path("configs/tvd/rules.yaml")
 PLATES = Path("configs/tvd/plates.yaml")
 EVIDENCE = Path("configs/tvd/evidence.yaml")
+SERVICE = Path("configs/service.yaml")
 
 
 def tracks_as_json(history: TrackHistory) -> list[dict]:
@@ -141,6 +143,24 @@ def review_summary(result: ReviewResult) -> str:
     return "\n".join(lines + [f"  failure: {failure}" for failure in result.failures])
 
 
+def run_serve(config_path: Path) -> None:
+    """Every setting and camera file is checked, and the models load, before the service listens. Ctrl+C stops it.
+
+    The REST layer's packages are imported here only: the other commands do not need them.
+    """
+    import uvicorn
+
+    from tvd.service.api import create_app
+    from tvd.service.core import ReviewService
+    from tvd.service.settings import load_service_settings
+
+    settings = load_service_settings(config_path)
+    service = ReviewService(settings)
+    for job_id in service.interrupted:
+        print(f"job {job_id} was running when the service stopped: it is marked failed", file=sys.stderr)
+    uvicorn.run(create_app(service), host=settings.server.host, port=settings.server.port)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="tvd")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -163,6 +183,8 @@ def main(argv: list[str] | None = None) -> int:
     review.add_argument("--rules", type=Path, default=RULE_DEFAULTS)
     review.add_argument("--plates", type=Path, default=PLATES)
     review.add_argument("--evidence", type=Path, default=EVIDENCE)
+    serve = commands.add_parser("serve", help="Run the review service and its REST API")
+    serve.add_argument("--config", type=Path, default=SERVICE)
     args = parser.parse_args(argv)
     try:
         if args.command == "track":
@@ -170,9 +192,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{summary['video']}: {summary['frames']} frames, {summary['tracks']} tracks, detector {summary['detector']}, tracker {summary['tracker']}, {summary['seconds']} s")
         elif args.command == "check":
             print(check_summary(run_check(args.video, args.camera, args.output, args.perception, args.rules)))
-        else:
+        elif args.command == "review":
             result = run_review(args.video, args.camera, args.recorded_at, args.output, args.perception, args.rules, args.plates, args.evidence)
             print(review_summary(result))
+        else:
+            run_serve(args.config)
     except (ValueError, FileNotFoundError, FileExistsError, RuntimeError) as error:  # ValueError covers ConfigError.
         print(f"error: {error}", file=sys.stderr)
         return 2
