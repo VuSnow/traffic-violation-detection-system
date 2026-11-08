@@ -17,6 +17,7 @@ from tvd.rules import Finding
 RULES = load_rule_defaults(ROOT / "configs" / "tvd" / "rules.yaml")
 READING = load_plates_config(ROOT / "configs" / "tvd" / "plates.yaml").reading
 SETTINGS = {"perception": {"tracker": "ocsort"}, "rules": RULES, "plates": {"version": 1}, "evidence": {"version": 1}}
+MODELS = {"detector": {"type": "yolo", "weights": "yolo26m.pt"}, "tracker": {"type": "ocsort"}, "plates": {"type": "onnx_worker"}, "software": {"numpy": "2.4.6"}, "code": None}
 RECORDED_AT = parse_recorded_at("2026-11-07T08:00:00+07:00")
 FOLDER = Path("/jobs/42")
 needs_notebook_outputs = pytest.mark.skipif(
@@ -25,7 +26,7 @@ needs_notebook_outputs = pytest.mark.skipif(
 
 
 def context(video_id: str = "cam1-0800", fps: float = 25.0) -> RecordContext:
-    return RecordContext(video_id, fps, 1920, 1080, "cam1", RECORDED_AT, f"{video_id}/ocsort", SETTINGS, {"camera": "sha256:0123456789ab"})
+    return RecordContext(video_id, fps, 1920, 1080, "cam1", RECORDED_AT, f"{video_id}/ocsort", SETTINGS, {"camera": "sha256:0123456789ab"}, MODELS)
 
 
 def red_finding(track_id: str = "7", trigger: int = 250, **evidence) -> Finding:
@@ -81,6 +82,7 @@ def test_a_record_is_pending_with_its_times_evidence_and_settings():
         "frames": [{"role": "entry", "frame_in_clip": 75, "source_frame": 250, "image": "evidence/evt_entry.jpg"}],
     }
     assert r["rule"] == {"name": "red_light", "version": 2} and r["settings"]["rule"] == RULES["red_light"] and r["config_files"] == {"camera": "sha256:0123456789ab"}
+    assert r["models"] == MODELS
     assert r["signal_source"] == "camera" and "signal_source" not in r["measurements"] and r["needs_attention"] == []
     assert r["review"] == {"status": "pending", "reviewer": None, "decided_at": None, "corrected_plate": None, "notes": None}
     assert validate_record(r) == []
@@ -105,6 +107,7 @@ def test_what_the_reviewer_should_check_is_flagged():
     (lambda r: r["time"].update(trigger_at="2026-11-07T08:00:10"), "time zone"),
     (lambda r: r["license_plate"].update(text="TEST1234"), "does not fit its status"),
     (lambda r: r.pop("camera_id"), "camera_id is missing"),
+    (lambda r: r.pop("models"), "models is missing"),
 ])
 def test_a_record_unfit_for_review_is_refused(change, problem):
     r = record()

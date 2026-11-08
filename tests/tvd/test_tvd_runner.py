@@ -49,6 +49,9 @@ def test_a_job_is_reviewed_in_its_folder_with_the_job_id_in_every_record(tmp_pat
     assert [r["event_id"] for r in records] == [f"evt-{JOB_ID}-wrong_way-f00048-t1", f"evt-{JOB_ID}-red_light-f00070-t1"] and len(result.records) == 2
     assert records[0]["track"]["tracking_session"] == f"{JOB_ID}/test-same-id" and records[0]["config_files"]["camera"] == camera.version
     assert set(records[0]["config_files"]) == {"perception", "rules", "plates", "evidence", "camera"} and (folder / "video.mp4").is_file()
+    models = records[0]["models"]
+    assert (models["detector"], models["tracker"], models["plates"]) == ({"type": "MovingCarDetector"}, {"type": "test-same-id"}, {"type": "FakePlateModels"})
+    assert models["software"]["numpy"] == "2.4.6" and "code" in models
     assert reports[0] == ("tracking", 0, 240) and reports[1] == ("tracking", 25, 240) and reports[-2:] == [("rules", 240, 240), ("evidence", 240, 240)]
 
 

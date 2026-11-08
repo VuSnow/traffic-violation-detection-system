@@ -104,6 +104,7 @@ def test_review_writes_a_folder_for_review_and_prints_a_summary(tmp_path, capsys
     record = json.loads((tmp_path / "job" / "records.json").read_text())["events"][0]
     assert record["time"]["trigger_at"] == "2026-11-07T08:00:02.917+07:00"  # Frame 70, at 24 frames per second.
     assert set(record["config_files"]) == {"perception", "camera", "rules", "plates", "evidence"} and record["settings"]["rule"]["pass_margin"] == 0.2
+    assert record["models"]["tracker"] == {"type": "test-same-id"} and record["models"]["plates"] == {"type": "FakePlateModels"}
 
 
 def test_review_needs_the_time_zone_of_the_first_frame_before_any_work(tmp_path, capsys, sample_video):

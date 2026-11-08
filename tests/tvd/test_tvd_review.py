@@ -47,7 +47,7 @@ def review(video, folder, plate_models=None, camera: dict = CAMERA):
         )
         settings = {"perception": {"tracker": "test-same-id"}, "rules": {n: r.settings for n, r in check.results.items()}, "plates": PLATES.model_dump(), "evidence": EVIDENCE.model_dump()}
         context = RecordContext("traffic_sample", reader.fps, reader.width, reader.height, "test-camera", parse_recorded_at("2026-11-07T08:00:00+07:00"),
-                                "traffic_sample/test-same-id", settings, {"camera": "sha256:000000000000"})
+                                "traffic_sample/test-same-id", settings, {"camera": "sha256:000000000000"}, {"detector": {"type": "test"}})
         return review_check(reader, check, context, plate_models, PLATES.reading, EVIDENCE, folder)
 
 

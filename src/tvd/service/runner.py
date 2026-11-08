@@ -17,6 +17,7 @@ from tvd.review import ReviewResult, review_check
 from tvd.service.cameras import Camera
 from tvd.service.jobs import Job
 from tvd.service.settings import SettingsFiles
+from tvd.versions import models_used
 from tvd.video import VideoReader
 
 PROGRESS_EVERY = 25  # frames between two progress reports
@@ -73,11 +74,13 @@ class Pipeline:
                 "perception": self.perception.model_dump(), "rules": {name: r.settings for name, r in check.results.items()},
                 "plates": self.plates.model_dump(), "evidence": self.evidence.model_dump(),
             }
+            plate_models = self.plate_models()
             context = RecordContext(
                 job.job_id, reader.fps, reader.width, reader.height, camera.camera_id, parse_recorded_at(job.recorded_at),
                 f"{job.job_id}/{self.perception.tracker.type}", settings, {**self.config_files, "camera": camera.version},
+                models_used(self.detector, self.perception.tracker, plate_models, self.plates_unavailable),
             )
-            return review_check(reader, check, context, self.plate_models(), self.plates.reading, self.evidence, folder, self.plates_unavailable)
+            return review_check(reader, check, context, plate_models, self.plates.reading, self.evidence, folder, self.plates_unavailable)
 
     def close(self) -> None:
         if self._plate_models is not None:

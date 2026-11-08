@@ -25,7 +25,7 @@ PLATE_ATTENTION = {UNCERTAIN: "plate_uncertain", UNREADABLE: "plate_unreadable",
 REQUIRED_FIELDS = {
     "schema_version": int, "event_id": str, "camera_id": str, "video": dict, "violation_type": str, "track": dict, "time": dict, "rule": dict,
     "why": str, "signal_source": (str, type(None)), "measurements": dict, "evidence": dict, "license_plate": dict, "needs_attention": list,
-    "settings": dict, "config_files": dict, "review": dict,
+    "settings": dict, "config_files": dict, "models": dict, "review": dict,
 }
 
 
@@ -50,7 +50,7 @@ class RecordContext:
     """What every record of one video shares.
 
     ``settings`` are the effective settings, as ``{"perception": ..., "rules": {name: ...}, "plates": ..., "evidence": ...}``,
-    and ``config_files`` the version of each settings file that gave them.
+    ``config_files`` the version of each settings file that gave them, and ``models`` the models and software (``models_used``).
     """
 
     video_id: str
@@ -62,6 +62,7 @@ class RecordContext:
     tracking_session: str
     settings: dict[str, Any]
     config_files: dict[str, str]
+    models: dict[str, Any]
 
 
 def event_id(video_id: str, finding: Finding) -> str:
@@ -131,6 +132,7 @@ def build_record(
             "plates": context.settings["plates"], "evidence": context.settings["evidence"],
         },
         "config_files": context.config_files,
+        "models": context.models,
         "review": {"status": PENDING, "reviewer": None, "decided_at": None, "corrected_plate": None, "notes": None},
     }
 

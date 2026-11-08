@@ -20,6 +20,7 @@ The review service (`src/tvd/records.py`) writes version 2. It keeps every field
 | `evidence` | Paths are relative to the folder of `records.json`: `clips/`, `evidence/` and `plates/`. Adds `clip_frames`: the clip's first frame and one past its last, in the video |
 | `settings` | New: the effective settings that produced the record, as `perception`, `rule`, `plates` and `evidence` |
 | `config_files` | New: the version of each settings file, as `sha256:` and the first 12 hex digits of its hash |
+| `models` | New: the models and software behind the record. `detector` names its weights, their version and its device (`cuda:0` or `cpu`); `tracker` its type and options; `plates` the plate models and their ONNX providers, the first being `CUDAExecutionProvider` on the GPU, or `unavailable` with the reason; `software` the versions of the libraries; `code` the commit of the Docker image, or null |
 | `review` | Always `pending`, with no reviewer: the service never decides. Review happens in the backend |
 
 The file is `{"schema_version": 2, "events": [...]}`.

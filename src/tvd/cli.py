@@ -25,6 +25,7 @@ from tvd.plates import load_plates_config
 from tvd.records import RecordContext, parse_recorded_at
 from tvd.review import ReviewResult, prepare_folder, review_check
 from tvd.tracking.history import TrackHistory
+from tvd.versions import models_used
 from tvd.video import VideoReader
 
 PERCEPTION = Path("configs/tvd/perception.yaml")
@@ -124,10 +125,12 @@ def run_review(
                 "perception": perception.model_dump(), "rules": {name: r.settings for name, r in check.results.items()},
                 "plates": plates.model_dump(), "evidence": evidence.model_dump(),
             }
+            unavailable = unavailable or "no plate models"
+            models = models_used(detector, perception.tracker, plate_models, unavailable)
             context = RecordContext(
-                video.stem, reader.fps, reader.width, reader.height, camera.camera_id, moment, f"{video.stem}/{perception.tracker.type}", settings, config_files,
+                video.stem, reader.fps, reader.width, reader.height, camera.camera_id, moment, f"{video.stem}/{perception.tracker.type}", settings, config_files, models,
             )
-            return review_check(reader, check, context, plate_models, plates.reading, evidence, output, unavailable or "no plate models")
+            return review_check(reader, check, context, plate_models, plates.reading, evidence, output, unavailable)
         finally:
             if plate_models is not None:
                 plate_models.close()
