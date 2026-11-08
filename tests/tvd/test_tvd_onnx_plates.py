@@ -77,6 +77,23 @@ def test_the_process_stops_when_nothing_refers_to_the_models():
     assert process.wait(timeout=15) == 0
 
 
+def test_models_that_do_not_answer_in_time_are_stopped():
+    hasty = build_plate_models(PLATES.models.model_copy(update={"options": {**PLATES.models.options, "timeout_seconds": 0.0001}}))
+    try:
+        assert hasty.is_alive()
+        with pytest.raises(RuntimeError, match="did not answer within 0.0001 s"):
+            hasty.detect(np.zeros((1080, 1920, 3), np.uint8))
+        assert not hasty.is_alive()
+    finally:
+        hasty.close()
+
+
+def test_closed_models_are_not_alive():
+    started = build_plate_models(PLATES.models)
+    started.close()
+    assert not started.is_alive()
+
+
 def test_a_stopped_process_gives_a_clear_error():
     started = build_plate_models(PLATES.models)
     started._process.kill()

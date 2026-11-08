@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import pickle
+import select
 import subprocess
 import sys
 import weakref
@@ -41,21 +42,26 @@ def stop_process(process: subprocess.Popen) -> None:
 class OnnxPlateModels(BasePlateModels):
     """Starts the models' process, and asks it to detect and read. It stops when closed, or when nothing refers to it any more."""
 
-    def __init__(self, detector_model: str, ocr_model: str, cpu_threads: int) -> None:
+    def __init__(self, detector_model: str, ocr_model: str, cpu_threads: int, timeout_seconds: float) -> None:
         options = {"detector_model": detector_model, "ocr_model": ocr_model, "cpu_threads": cpu_threads}
+        self.timeout_seconds = timeout_seconds
         source_root = str(Path(__file__).resolve().parents[2])  # So that the process runs this same code.
         environment = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [source_root, os.environ.get("PYTHONPATH")]))}
         self._process = subprocess.Popen(
             [sys.executable, "-m", "tvd.plates.onnx_process", json.dumps(options)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=environment,
         )
         self._finalizer = weakref.finalize(self, stop_process, self._process)
-        self.providers: list[str] = self._receive()
+        self.providers: list[str] = self._receive()  # Loading the models may take long, the first time: no time limit.
 
     @property
     def pid(self) -> int:
         return self._process.pid
 
-    def _receive(self) -> Any:
+    def _receive(self, timeout: float | None = None) -> Any:
+        if timeout is not None and not select.select([self._process.stdout], [], [], timeout)[0]:
+            self._process.kill()
+            self._process.wait()
+            raise RuntimeError(f"The plate models did not answer within {timeout:g} s; their process was stopped")
         try:
             ok, value = pickle.load(self._process.stdout)
         except EOFError as error:
@@ -71,7 +77,7 @@ class OnnxPlateModels(BasePlateModels):
             self._process.stdin.flush()
         except (BrokenPipeError, ValueError) as error:
             raise RuntimeError(f"The plate models' process stopped (exit code {self._process.poll()}).") from error
-        return self._receive()
+        return self._receive(self.timeout_seconds)
 
     def detect(self, image: np.ndarray) -> list[PlateBox]:
         return self.call("detect", image)
@@ -81,3 +87,6 @@ class OnnxPlateModels(BasePlateModels):
 
     def close(self) -> None:
         self._finalizer()
+
+    def is_alive(self) -> bool:
+        return self._process.poll() is None

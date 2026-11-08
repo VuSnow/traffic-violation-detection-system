@@ -32,7 +32,9 @@ class NotebookModels:
 def test_the_settings_file_has_the_notebooks_values():
     from traffic_violation_detection.plates import PLATE_SETTINGS
 
-    assert {"version": PLATES.version, **PLATES.models.options, **READING.model_dump()} == PLATE_SETTINGS and PLATES.models.type == "onnx_worker"
+    options = {k: v for k, v in PLATES.models.options.items() if k != "timeout_seconds"}  # New in the service: the notebooks wait for ever.
+    assert {"version": PLATES.version, **options, **READING.model_dump()} == PLATE_SETTINGS and PLATES.models.type == "onnx_worker"
+    assert PLATES.models.options["timeout_seconds"] == 60
 
 
 def test_a_wrong_setting_is_named(tmp_path):
@@ -46,6 +48,10 @@ def test_models_are_chosen_by_name_and_closed_after_use():
     with PLATE_MODELS.create("test-plate", text="FAKE9999") as models:
         assert models.recognize(IMAGE).characters == "FAKE9999_"
     assert models.closed
+
+
+def test_models_without_a_process_are_always_alive():
+    assert FakePlateModels().is_alive()
 
 
 def test_plate_models_must_detect_and_recognize():

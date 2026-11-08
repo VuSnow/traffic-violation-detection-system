@@ -47,6 +47,10 @@ class BasePlateModels(ABC):
     def close(self) -> None:
         """Release what the models hold. Nothing, by default."""
 
+    def is_alive(self) -> bool:
+        """False once the models can no longer answer, and must be started again. Always True, by default."""
+        return True
+
     def __enter__(self) -> BasePlateModels:
         return self
 

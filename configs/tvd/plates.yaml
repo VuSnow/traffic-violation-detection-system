@@ -6,6 +6,7 @@ models:                       # what finds and reads plates; change "type" to sw
     detector_model: yolo-v9-t-640-license-plate-end2end
     ocr_model: cct-s-v2-global-model
     cpu_threads: 8            # only for what ONNX runs on the CPU, such as on a machine with no GPU
+    timeout_seconds: 60       # a call not answered within this stops the models' process: one frame takes milliseconds
 reading:
   frames_per_track: 12        # the frames where the vehicle looks largest
   min_frame_gap: 4            # neighbouring frames are nearly the same, so they would not be independent votes
