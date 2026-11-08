@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
@@ -50,6 +51,10 @@ class BasePlateModels(ABC):
     def is_alive(self) -> bool:
         """False once the models can no longer answer, and must be started again. Always True, by default."""
         return True
+
+    def describe(self) -> dict[str, Any]:
+        """What these models are, for records and the health check. Real models name themselves and where they run."""
+        return {"type": type(self).__name__}
 
     def __enter__(self) -> BasePlateModels:
         return self

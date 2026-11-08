@@ -1,7 +1,9 @@
 """Ultralytics YOLO models, behind ``BaseDetector``."""
 
 from pathlib import Path
+from typing import Any
 
+from tvd.config import file_version
 from tvd.detection.base import DETECTORS, BaseDetector
 from tvd.domain import Box, Detection, Frame
 
@@ -28,11 +30,19 @@ class YoloDetector(BaseDetector):
         except ImportError as error:
             raise RuntimeError('The YOLO detector needs Ultralytics: pip install -e ".[detection]"') from error
         Path(weights_dir).mkdir(parents=True, exist_ok=True)
-        self._model = YOLO(str(Path(weights_dir) / weights))
+        self._weights = Path(weights_dir) / weights
+        self._model = YOLO(str(self._weights))
         self._image_size = image_size
         self._confidence = confidence
         self._iou = iou
         self._class_ids = None if classes is None else self._ids_of(classes, weights)
+
+    def describe(self) -> dict[str, Any]:
+        import torch
+
+        # Ultralytics predicts on the first GPU when there is one.
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        return {"type": "yolo", "weights": self._weights.name, "weights_version": file_version(self._weights), "device": device}
 
     def _ids_of(self, classes: list[str], weights: str) -> list[int]:
         ids = {name: class_id for class_id, name in self._model.names.items()}

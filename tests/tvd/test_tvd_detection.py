@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 from conftest import ROOT
 
+from tvd.config import file_version
 from tvd.detection import DETECTORS, BaseDetector
 from tvd.domain import Frame
 from tvd.video import VideoReader
@@ -50,3 +51,18 @@ def test_an_unknown_class_is_refused(monkeypatch):
     monkeypatch.chdir(ROOT)
     with pytest.raises(ValueError, match="no classes named \\['tractor'\\]"):
         DETECTORS.create("yolo", weights="yolo26m.pt", classes=["car", "tractor"])
+
+
+def test_a_detector_describes_itself_by_its_class_by_default():
+    assert DETECTORS.create("test-moving-car").describe() == {"type": "MovingCarDetector"}
+
+
+@needs_yolo
+def test_yolo_names_its_weights_their_version_and_its_device(monkeypatch):
+    import torch
+
+    monkeypatch.chdir(ROOT)
+    assert DETECTORS.create("yolo", weights="yolo26m.pt").describe() == {
+        "type": "yolo", "weights": "yolo26m.pt", "weights_version": file_version(ROOT / "weights" / "yolo26m.pt"),
+        "device": "cuda:0" if torch.cuda.is_available() else "cpu",
+    }

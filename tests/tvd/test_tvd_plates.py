@@ -50,6 +50,10 @@ def test_models_are_chosen_by_name_and_closed_after_use():
     assert models.closed
 
 
+def test_plate_models_describe_themselves_by_their_class_by_default():
+    assert FakePlateModels().describe() == {"type": "FakePlateModels"}
+
+
 def test_models_without_a_process_are_always_alive():
     assert FakePlateModels().is_alive()
 

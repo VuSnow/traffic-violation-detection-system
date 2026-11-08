@@ -35,6 +35,12 @@ def test_the_models_run_in_another_process(models):
     assert models.pid != os.getpid()
 
 
+def test_the_models_say_what_they_are_and_where_they_run(models):
+    assert models.describe() == {
+        "type": "onnx_worker", "detector_model": "yolo-v9-t-640-license-plate-end2end", "ocr_model": "cct-s-v2-global-model", "providers": models.providers,
+    }
+
+
 @pytest.mark.skipif(shutil.which("nvidia-smi") is None, reason="There is no GPU here.")
 def test_the_models_use_the_gpu_where_there_is_one(models):
     assert models.providers[0] == "CUDAExecutionProvider"

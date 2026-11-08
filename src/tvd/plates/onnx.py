@@ -44,6 +44,8 @@ class OnnxPlateModels(BasePlateModels):
 
     def __init__(self, detector_model: str, ocr_model: str, cpu_threads: int, timeout_seconds: float) -> None:
         options = {"detector_model": detector_model, "ocr_model": ocr_model, "cpu_threads": cpu_threads}
+        self.detector_model = detector_model
+        self.ocr_model = ocr_model
         self.timeout_seconds = timeout_seconds
         source_root = str(Path(__file__).resolve().parents[2])  # So that the process runs this same code.
         environment = {**os.environ, "PYTHONPATH": os.pathsep.join(filter(None, [source_root, os.environ.get("PYTHONPATH")]))}
@@ -90,3 +92,7 @@ class OnnxPlateModels(BasePlateModels):
 
     def is_alive(self) -> bool:
         return self._process.poll() is None
+
+    def describe(self) -> dict[str, Any]:
+        """``providers`` begins with ``CUDAExecutionProvider`` when the models run on the GPU, and with the CPU's when the GPU was full."""
+        return {"type": "onnx_worker", "detector_model": self.detector_model, "ocr_model": self.ocr_model, "providers": self.providers}
