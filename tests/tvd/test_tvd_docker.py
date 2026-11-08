@@ -1,6 +1,9 @@
 """The Docker image's files. Building and running it is checked on the server: see the plan of Part 5."""
 
 import importlib.util
+import os
+import subprocess
+import sys
 from importlib import metadata
 
 import pytest
@@ -55,4 +58,27 @@ def test_the_image_runs_as_the_storage_s_owner_and_checks_its_own_health():
     dockerfile = (DOCKER / "Dockerfile").read_text()
     assert "FROM python:3.11.18-slim-bookworm" in dockerfile and "pip install --no-deps boxmot==26.0.0" in dockerfile
     assert "USER 1000:1000" in dockerfile and "HEALTHCHECK" in dockerfile and "/health" in dockerfile
+    assert "COPY docker/models /app/home/.cache" in dockerfile and "RUN python docker/check_plate_models.py" in dockerfile
     assert 'CMD ["python", "-m", "tvd.cli", "serve", "--config", "configs/service.docker.yaml"]' in dockerfile
+
+
+def copy_models(home, target):
+    return subprocess.run([sys.executable, str(DOCKER / "copy_plate_models.py"), str(target)], capture_output=True, text=True, cwd=ROOT, env={**os.environ, "HOME": str(home)})
+
+
+def test_the_plate_models_the_tests_used_go_into_the_image(tmp_path):
+    for folder, name in (("open-image-models/yolo-v9-t-640-license-plate-end2end", "model.onnx"), ("fast-plate-ocr/cct-s-v2-global-model", "ocr.onnx")):
+        (tmp_path / "home" / ".cache" / folder).mkdir(parents=True)
+        (tmp_path / "home" / ".cache" / folder / name).write_bytes(b"weights")
+    assert copy_models(tmp_path / "home", tmp_path / "models").returncode == 0
+    copied = sorted(p.relative_to(tmp_path / "models").as_posix() for p in (tmp_path / "models").rglob("*.onnx"))
+    assert copied == ["fast-plate-ocr/cct-s-v2-global-model/ocr.onnx", "open-image-models/yolo-v9-t-640-license-plate-end2end/model.onnx"]
+
+
+def test_plate_models_never_downloaded_here_are_named(tmp_path):
+    done = copy_models(tmp_path, tmp_path / "models")
+    assert done.returncode != 0 and "open-image-models/yolo-v9-t-640-license-plate-end2end" in done.stderr
+
+
+def test_the_plate_models_stay_out_of_git():
+    assert "docker/models/" in (ROOT / ".gitignore").read_text().splitlines()

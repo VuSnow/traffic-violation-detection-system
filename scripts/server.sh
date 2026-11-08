@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Work on the GPU server from this machine.
-#   scripts/server.sh sync             make the server's src/, tests/, configs/, scripts/, docker/, pyproject.toml and .dockerignore the same as here
+#   scripts/server.sh sync             make the server's src/, tests/, configs/, scripts/, docker/, pyproject.toml, .dockerignore and .gitignore the same as here
 #   scripts/server.sh test [args]      run pytest there, e.g. scripts/server.sh test tests/tvd -q -k "yolo and notebooks"
 #   scripts/server.sh run <command>    run a command there, in the project folder, with the tvd environment first on PATH
 set -euo pipefail
@@ -18,7 +18,7 @@ case "${1:-}" in
         # --delete removes files deleted or renamed here, so the server never runs a test that no longer exists.
         # Excluded files are neither copied nor deleted: each machine keeps its own caches and install records.
         rsync -az --delete --timeout=60 -e "${SSH[*]}" --exclude '__pycache__/' --exclude '*.egg-info/' \
-            src tests configs scripts docker pyproject.toml .dockerignore "$HOST:$REMOTE_DIR/"
+            src tests configs scripts docker pyproject.toml .dockerignore .gitignore "$HOST:$REMOTE_DIR/"
         echo "synced to $HOST:$REMOTE_DIR"
         ;;
     test)

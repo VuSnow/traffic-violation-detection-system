@@ -225,6 +225,8 @@ __marimo__/
 outputs/
 # Model weights / exported models
 weights/
+# The plate models copied into the Docker image by scripts/deploy.sh build: their licence is not stated.
+docker/models/
 *.pt
 *.pth
 *.onnx

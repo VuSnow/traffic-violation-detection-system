@@ -19,11 +19,13 @@ RUN mkdir -p src/tvd src/traffic_violation_detection \
  && pip install --extra-index-url https://download.pytorch.org/whl/cu132 -c docker/constraints.txt ".[detection,tracking,plates,service]" \
  && pip install --no-deps boxmot==26.0.0
 
-# The models, inside the image: it runs the same models wherever it runs, and never downloads them.
+# The models the tests used, inside the image: it runs the same models wherever it runs, and never downloads them.
+# scripts/deploy.sh build copies the plate models from the server's cache to docker/models first.
 COPY weights/yolo26m.pt weights/yolo26m.pt
 COPY configs configs
-COPY docker/download_plate_models.py docker/download_plate_models.py
-RUN python docker/download_plate_models.py
+COPY docker/models /app/home/.cache
+COPY docker/check_plate_models.py docker/check_plate_models.py
+RUN python docker/check_plate_models.py
 
 # The code last: a change to it rebuilds only this layer.
 COPY src src

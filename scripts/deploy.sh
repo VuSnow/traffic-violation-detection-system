@@ -2,7 +2,8 @@
 # The review service in Docker, on the machine this runs on (ai_server_2). Run it in the project folder there:
 #   scripts/server.sh run scripts/deploy.sh <command>
 #
-#   build <commit>   build the image tvd-service:<commit> from docker/Dockerfile, and tag it tvd-service:latest
+#   build <commit>   copy the plate models the tests used into docker/models, then build the image
+#                    tvd-service:<commit> from docker/Dockerfile, and tag it tvd-service:latest
 #   start            run tvd-service:latest: on the GPU, on port 8040 of this machine only, with its jobs in
 #                    outputs/service, and started again by Docker after a crash or a reboot
 #   stop             stop it and remove the container; the jobs stay in outputs/service
@@ -23,6 +24,7 @@ run() {
 case "${1:-}" in
     build)
         commit="${2:?the commit to name the image after, such as $(git rev-parse --short HEAD 2>/dev/null || echo 6b1a1ba)}"
+        run python docker/copy_plate_models.py docker/models
         run docker build -f docker/Dockerfile --build-arg "TVD_COMMIT=$commit" -t "$IMAGE:$commit" -t "$IMAGE:latest" .
         ;;
     start)

@@ -1,4 +1,7 @@
-"""Download the plate models named in configs/tvd/plates.yaml into the image, on the CPU: building has no GPU."""
+"""Load the plate models copied into the image, on the CPU (building has no GPU), so that a missing file fails the build.
+
+The libraries find them in their cache, $HOME/.cache, and download nothing.
+"""
 
 import yaml
 from fast_plate_ocr import LicensePlateRecognizer

@@ -12,10 +12,13 @@ def deploy(*arguments: str) -> subprocess.CompletedProcess:
     return subprocess.run(["bash", str(SCRIPT), *arguments], capture_output=True, text=True, cwd=ROOT, env={**os.environ, "TVD_DRY_RUN": "1"})
 
 
-def test_the_image_is_named_after_its_commit_and_tagged_latest():
+def test_the_image_gets_the_tested_plate_models_and_is_named_after_its_commit():
     done = deploy("build", "6b1a1ba")
     assert done.returncode == 0
-    assert done.stdout.strip() == "docker build -f docker/Dockerfile --build-arg TVD_COMMIT=6b1a1ba -t tvd-service:6b1a1ba -t tvd-service:latest ."
+    assert done.stdout.strip().split("\n") == [
+        "python docker/copy_plate_models.py docker/models",
+        "docker build -f docker/Dockerfile --build-arg TVD_COMMIT=6b1a1ba -t tvd-service:6b1a1ba -t tvd-service:latest .",
+    ]
 
 
 def test_the_service_runs_on_the_gpu_on_this_machine_only_and_is_restarted_by_docker():
