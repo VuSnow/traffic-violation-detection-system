@@ -40,10 +40,16 @@ class ReviewResult:
         }
 
 
+REVIEW_FILES = ("records.json", "summary.json", "clips", "evidence", "plates")
+
+
 def prepare_folder(folder: Path) -> None:
-    """A new folder, or an empty one: files of an earlier run could show the wrong moment."""
-    if folder.exists() and (not folder.is_dir() or any(folder.iterdir())):
-        raise FileExistsError(f"The output must be a new or empty folder: {folder}")
+    """A folder with no earlier review, whose files could show the wrong moment. Other files, such as the uploaded video, may be there."""
+    if folder.exists() and not folder.is_dir():
+        raise FileExistsError(f"The output must be a folder: {folder}")
+    earlier = [name for name in REVIEW_FILES if (folder / name).exists()]
+    if earlier:
+        raise FileExistsError(f"The output folder already holds a review ({', '.join(earlier)}): {folder}")
     folder.mkdir(parents=True, exist_ok=True)
 
 

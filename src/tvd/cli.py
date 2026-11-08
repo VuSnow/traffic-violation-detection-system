@@ -158,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
     review.add_argument("--video", type=Path, required=True)
     review.add_argument("--camera", type=Path, required=True)
     review.add_argument("--recorded-at", required=True, help="The time of the first frame, with its time zone: 2026-11-07T08:00:00+07:00")
-    review.add_argument("--output", type=Path, required=True, help="A new or empty folder")
+    review.add_argument("--output", type=Path, required=True, help="A folder with no earlier review")
     review.add_argument("--perception", type=Path, default=PERCEPTION)
     review.add_argument("--rules", type=Path, default=RULE_DEFAULTS)
     review.add_argument("--plates", type=Path, default=PLATES)

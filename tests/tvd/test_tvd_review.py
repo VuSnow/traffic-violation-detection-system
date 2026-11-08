@@ -86,14 +86,19 @@ def test_without_plate_models_the_records_say_so(tmp_path, sample_video):
 
 def test_a_folder_already_in_use_is_refused(tmp_path, sample_video):
     (tmp_path / "records.json").write_text("{}")
-    with pytest.raises(FileExistsError, match="new or empty folder"):
+    with pytest.raises(FileExistsError, match=r"already holds a review \(records.json\)"):
         review(sample_video, tmp_path, FakePlateModels())
     assert sorted(p.name for p in tmp_path.iterdir()) == ["records.json"]
 
 
+def test_a_folder_that_holds_only_the_uploaded_video_is_used(tmp_path, sample_video):
+    (tmp_path / "video.mp4").write_bytes(sample_video.read_bytes())
+    assert len(review(tmp_path / "video.mp4", tmp_path, FakePlateModels()).records) == 2 and (tmp_path / "records.json").is_file()
+
+
 def test_a_file_where_the_folder_should_be_is_refused(tmp_path, sample_video):
     (tmp_path / "job").write_text("not a folder")
-    with pytest.raises(FileExistsError, match="new or empty folder"):
+    with pytest.raises(FileExistsError, match="must be a folder"):
         review(sample_video, tmp_path / "job", FakePlateModels())
 
 

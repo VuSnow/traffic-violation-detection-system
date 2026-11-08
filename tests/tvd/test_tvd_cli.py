@@ -115,7 +115,7 @@ def test_review_refuses_a_folder_in_use(tmp_path, capsys, sample_video):
     (tmp_path / "job").mkdir()
     (tmp_path / "job" / "records.json").write_text("{}")
     assert main(argv) == 2
-    assert "error: The output must be a new or empty folder" in capsys.readouterr().err
+    assert "error: The output folder already holds a review (records.json)" in capsys.readouterr().err
 
 
 @PLATE_MODELS.register("test-cannot-start")
