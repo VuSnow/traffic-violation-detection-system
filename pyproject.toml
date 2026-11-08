@@ -63,12 +63,18 @@ evaluation = [
     "motmetrics>=1.4,<2",
 ]
 # For the review service (src/tvd). pydantic (MIT) checks settings files; PyYAML (MIT) reads them.
+# FastAPI (MIT) and uvicorn (BSD) serve the REST API; python-multipart (Apache-2.0) reads uploaded files.
 service = [
     "pydantic>=2.6,<3",
     "pyyaml>=6.0,<7",
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.32,<1",
+    "python-multipart>=0.0.20",
 ]
+# httpx (BSD) is what FastAPI's test client sends requests with.
 dev = [
     "pytest>=8",
+    "httpx>=0.28,<1",
 ]
 
 [tool.setuptools.packages.find]
