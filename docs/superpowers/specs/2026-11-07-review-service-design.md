@@ -141,7 +141,7 @@ The port is configurable. Port 8000 is already taken by another service on ai_se
 
 ## 12. How it is built (decided by the user, 2026-11-07)
 
-- **Each part has a step-by-step plan** in `docs/superpowers/plans/`, so that the user can build it, or build it again, to learn how such a system is made, from the algorithms to deployment: one unit per step, with its full code, the command to run and the output to expect. Every plan is run on ai_server_2 before it is handed over. At the user's request, the assistant then carried out Parts 1 and 2 from their plans.
+- **Each part has a step-by-step plan** in `docs/superpowers/plans/`, so that the user can build it, or build it again, to learn how such a system is made, from the algorithms to deployment: one unit per step, with its full code, the command to run and the output to expect. The plans of Parts 1 to 4 were run on ai_server_2 before they were handed over, and the assistant then carried out each from its plan, at the user's request. Part 5 was built first, at the user's request, and its plan written from its commits.
 - **The algorithms are rewritten** in a new package, `src/tvd/`. The notebooks' package, `traffic_violation_detection`, stays as it is, and it is the reference: wherever the new code is compared with it, the results must match exactly.
 - **SOLID, with replaceable components.** Each kind of component (detector, tracker, rule, plate reader, storage) has an abstract base class and a registry. A settings file names the implementation, a factory builds it, and the pipeline only knows the base classes. Changing ByteTrack for OC-SORT is a change of one word in a YAML file.
 - **Five parts,** each ending with working, tested software:
