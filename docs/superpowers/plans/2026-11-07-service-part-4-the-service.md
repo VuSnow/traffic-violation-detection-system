@@ -2985,8 +2985,10 @@ Expected: `340 passed`.
 
 This runs the real service on the server, with `configs/service.yaml`: it listens on port 8040 of the server only, and keeps its jobs in `outputs/service/`. Start it in the background, and keep its log:
 
+The braces matter: `scripts/server.sh run` puts `cd ... &&` before the command, and without them `&` would send that whole line to the background, which keeps the ssh session, and your terminal, waiting.
+
 ```bash
-scripts/server.sh run 'setsid nohup python -m tvd.cli serve > /tmp/tvd-serve.log 2>&1 < /dev/null &'
+scripts/server.sh run '{ setsid nohup python -m tvd.cli serve > /tmp/tvd-serve.log 2>&1 < /dev/null & }'
 scripts/server.sh run 'sleep 20; curl -s localhost:8040/cameras'
 ```
 
